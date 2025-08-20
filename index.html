@@ -661,10 +661,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Colonization and Demographics
             if (population >= CITY_POP_CAP) {
-                // Send scouts if global pop allows
                 if (bumbles.length < GLOBAL_POP_CAP - 2) {
-                    const maleScout = cityBumbles.find(b => b.gender === 'male' && !b.isPresident && b.job !== 'scientist' && b.job !== 'scout');
-                    const femaleScout = cityBumbles.find(b => b.gender === 'female' && !b.isPresident && b.job !== 'scientist' && b.job !== 'scout');
+                    const potentialScouts = cityBumbles.filter(b => !b.isPresident && b.job !== 'scientist' && b.job !== 'scout');
+                    const maleScout = potentialScouts.find(b => b.gender === 'male');
+                    const femaleScout = potentialScouts.find(b => b.gender === 'female');
+                    
                     if (maleScout && femaleScout) {
                         [maleScout, femaleScout].forEach(scout => {
                             scout.state = 'scouting'; scout.job = 'scout'; scout.cityId = null; scout.provinceId = null;
@@ -673,7 +674,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
                     }
                 }
-                // Assign scientists
                 const scientists = cityBumbles.filter(b => b.job === 'scientist');
                 if (scientists.length < 3) {
                     const candidates = cityBumbles.filter(b => b.job !== 'scientist' && !b.isPresident).sort((a, b) => b.intelligence - a.intelligence);
@@ -714,7 +714,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function manageArmies() {
         bumbles.forEach(b => b.warHighlight = null);
         
-        // President commands soldiers
         provinces.forEach(province => {
             const myCities = cities.filter(c => c.provinceId === province.id);
             const threatenedCity = myCities.find(city => bumbles.some(b => b.provinceId && b.provinceId !== province.id && getDistance(city.x, city.y, b.x, b.y) < city.territoryRadius));
@@ -724,7 +723,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Armies form and attack
         for (const city of cities) {
             if (!city.provinceId) continue;
             const army = bumbles.filter(b => b.cityId === city.id && b.state === 'formingArmy');
@@ -737,7 +735,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Highlight warring bumbles
         bumbles.forEach(b => {
             if (b.state === 'attacking' || b.state === 'defending' || (b.isPresident && b.state === 'defending')) {
                 const province = provinces.find(p => p.id === b.provinceId);
@@ -755,7 +752,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (frameCount % 100 === 0) manageCivilization();
         if (frameCount % 300 === 0) manageArmies();
 
-        // Scientist Actions
         const scientists = bumbles.filter(b => b.job === 'scientist' && !b.isDead);
         if (scientists.length > 0) {
             const infectedMap = new Map();
@@ -763,14 +759,23 @@ document.addEventListener('DOMContentLoaded', () => {
             scientists.forEach(scientist => { if (infectedMap.has(scientist.cityId)) { infectedMap.get(scientist.cityId).forEach(infected => infected.isZombie = false); infectedMap.delete(scientist.cityId); } });
         }
 
-        // Interactions and Collisions
         for (let i = bumbles.length - 1; i >= 0; i--) {
             const b = bumbles[i];
             if (b.isDead) continue;
             for (let j = foods.length - 1; j >= 0; j--) { if (getDistance(b.x, b.y, foods[j].x, foods[j].y) < b.radius + foods[j].radius) { if (b.state === 'seekingFood') { b.needs.health = Math.min(120, b.needs.health + foods[j].energy); b.state = 'wandering'; } else if ((b.state === 'foraging' || b.state === 'harvesting') && !b.heldResource) { b.heldResource = 'food'; } b.target = null; foods.splice(j, 1); break; } }
             for (let j = resources.length - 1; j >= 0; j--) { const r = resources[j]; if (r instanceof Tree && getDistance(b.x, b.y, r.x, r.y) < b.radius + r.radius && !b.heldResource && (b.state === 'harvesting' || b.state === 'foraging')) { r.woodAmount--; b.heldResource = 'wood'; if (r.woodAmount <= 0) resources.splice(j, 1); b.target = null; } }
             for (let j = cities.length - 1; j >= 0; j--) { const c = cities[j]; if (getDistance(b.x, b.y, c.x, c.y) < c.radius) { if (b.cityId === null) { b.cityId = c.id; b.provinceId = c.provinceId; } if (b.heldResource && (b.state === 'depositingFood' || b.state === 'depositingWood')) { c[b.heldResource + 'Stockpile']++; b.heldResource = null; b.state = 'wandering'; } if (b.state === 'seekingFood' && c.foodStockpile > 0) { c.foodStockpile--; b.needs.health = 120; b.state = 'wandering'; } if ((b.job === 'soldier' || b.isPresident) && b.provinceId !== c.provinceId) { c.health -= 1; if (c.health <= 0) { c.provinceId = b.provinceId; c.health = 500; bumbles.filter(bum => bum.cityId === c.id).forEach(bum => bum.provinceId = b.provinceId); } } } if (c.constructionSite && getDistance(b.x, b.y, c.constructionSite.x, c.constructionSite.y) < b.radius + 10 && b.heldResource === 'wood') { b.heldResource = null; c.constructionSite.addWood(); if (c.constructionSite.isComplete) c.buildStructure(); b.state = 'wandering'; } }
-            for (let j = i - 1; j >= 0; j--) { const b2 = bumbles[j]; if (b2.isDead) continue; if (getDistance(b.x, b.y, b2.x, b2.y) < b.radius + b2.radius) { if (b.state === 'seekingMate' && b2.state === 'seekingMate' && b.gender !== b2.gender) b.reproduce(b2); else if ((b.job === 'soldier' || b.isPresident) && b2.provinceId && b.provinceId !== b2.provinceId) b2.needs.health -= 0.5; else if (b.isZombie && !b2.isZombie && b2.job !== 'scientist') b2.isZombie = true; else if (b2.isZombie && !b.isZombie && b.job !== 'scientist') b.isZombie = true; } }
+            for (let j = i - 1; j >= 0; j--) { const b2 = bumbles[j]; if (b2.isDead) continue; 
+                // --- FIX START ---
+                // The distance calculation was using b.y instead of b2.y, preventing interactions.
+                if (getDistance(b.x, b.y, b2.x, b2.y) < b.radius + b2.radius) { 
+                // --- FIX END ---
+                    if (b.state === 'seekingMate' && b2.state === 'seekingMate' && b.gender !== b2.gender) b.reproduce(b2); 
+                    else if ((b.job === 'soldier' || b.isPresident) && b2.provinceId && b.provinceId !== b2.provinceId) b2.needs.health -= 0.5; 
+                    else if (b.isZombie && !b2.isZombie && b2.job !== 'scientist') b2.isZombie = true; 
+                    else if (b2.isZombie && !b.isZombie && b.job !== 'scientist') b.isZombie = true; 
+                } 
+            }
         }
         
         bumbles = bumbles.filter(b => !b.isDead);
@@ -800,15 +805,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateUI() {
-        populationStat.textContent = `${bumbles.length} / ${GLOBAL_POP_CAP}`;
+        const livingBumbles = bumbles.filter(b => !b.isDead);
+        populationStat.textContent = `${livingBumbles.length} / ${GLOBAL_POP_CAP}`;
         dayStat.textContent = Math.floor(day);
         timeOfDayStat.textContent = timeOfDay;
         provincesStat.textContent = provinces.length;
         citiesStat.textContent = cities.length;
-        scientistsStat.textContent = bumbles.filter(b => b.job === 'scientist').length;
-        workersStat.textContent = bumbles.filter(b => b.job === 'worker').length;
-        soldiersStat.textContent = bumbles.filter(b => b.job === 'soldier').length;
-        infectedStat.textContent = bumbles.filter(b => b.isZombie).length;
+        scientistsStat.textContent = livingBumbles.filter(b => b.job === 'scientist').length;
+        workersStat.textContent = livingBumbles.filter(b => b.job === 'worker').length;
+        soldiersStat.textContent = livingBumbles.filter(b => b.job === 'soldier' || (b.isPresident && b.state === 'defending')).length;
+        infectedStat.textContent = livingBumbles.filter(b => b.isZombie).length;
     }
     
     // --- EVENT LISTENERS & SETUP ---
