@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Bumbles</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,6 +15,12 @@
             --sky-horizon: #38bdf8;
             --ground-color: #1e293b;
         }
+        html, body {
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            position: fixed;
+        }
         body {
             font-family: 'Inter', sans-serif;
             background-color: #020617;
@@ -22,6 +28,8 @@
             overscroll-behavior: none;
         }
         #simulation-container {
+            width: 100dvw;
+            height: 100dvh;
             transition: background 2s ease-in-out;
         }
         .glassmorphism {
@@ -67,8 +75,8 @@
             opacity: 1;
             visibility: visible;
         }
-        canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: default; }
-        #bumble-energy-bar { transition: width 0.5s ease-in-out; }
+        canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+        canvas:active { cursor: grabbing; }
         .draggable {
             position: absolute;
             z-index: 10;
@@ -84,6 +92,22 @@
         #start-screen {
             transition: opacity 0.5s ease-out;
         }
+        #stats-panel-content {
+            transition: all 0.5s ease-in-out, grid-template-rows 0.5s step-end;
+            overflow: hidden;
+            display: grid;
+            grid-template-rows: 1fr;
+        }
+        #stats-panel.collapsed #stats-panel-content {
+            grid-template-rows: 0fr;
+            transition: all 0.5s ease-in-out, grid-template-rows 0.5s step-start;
+            padding-top: 0;
+            padding-bottom: 0;
+        }
+        #family-list-stat {
+            max-height: 60px;
+            overflow-y: auto;
+        }
     </style>
 </head>
 <body class="overflow-hidden h-screen w-screen flex items-center justify-center">
@@ -92,35 +116,31 @@
         <canvas id="simulationCanvas"></canvas>
 
         <!-- UI Panels -->
-        <div id="stats-panel" class="draggable glassmorphism rounded-lg text-xs md:text-sm w-48" style="top: 1rem; right: 1rem;">
-            <div class="drag-handle rounded-t-lg text-center text-slate-300 font-bold">Statistics</div>
-            <div class="p-3">
-                <div class="grid grid-cols-2 gap-x-4 gap-y-1">
-                    <p>Population:</p><p class="text-right"><span id="population-stat" class="font-semibold text-white">0</span></p>
-                    <p>Day:</p><p class="text-right"><span id="day-stat" class="font-semibold text-white">0</span> (<span id="time-of-day-stat">Day</span>)</p>
-                    <p>Cities:</p><p class="text-right"><span id="cities-stat" class="font-semibold text-white">0</span></p>
-                    <p>Families:</p><p class="text-right"><span id="families-stat" class="font-semibold text-white">0</span></p>
-                </div>
-                <div id="stats-details-wrapper" class="overflow-hidden transition-[grid-template-rows] duration-500 ease-in-out grid grid-rows-[0fr]">
-                    <div class="min-h-0">
-                        <div class="border-t border-slate-600 my-2"></div>
-                        <div class="grid grid-cols-2 gap-x-4 gap-y-1">
-                           <p>Deaths:</p><p class="text-right"><span id="deaths-stat" class="font-semibold text-white">0</span></p>
-                           <p>Mutations:</p><p class="text-right"><span id="mutations-stat" class="font-semibold text-white">0</span></p>
-                           <p>Max Gen:</p><p class="text-right"><span id="max-gen-stat" class="font-semibold text-white">0</span></p>
-                           <p>Avg. Intel:</p><p class="text-right"><span id="avg-intel-stat" class="font-semibold text-white">0</span></p>
-                        </div>
+        <div id="stats-panel" class="draggable glassmorphism rounded-lg text-xs md:text-sm w-56" style="top: 1rem; right: 1rem;">
+            <div class="drag-handle rounded-t-lg text-center text-slate-300 font-bold flex justify-between items-center pr-2">
+                <span class="flex-grow text-center">Statistics</span>
+                 <button id="collapse-stats-btn" class="p-1 rounded-full hover:bg-slate-600/50">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-300 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                </button>
+            </div>
+            <div id="stats-panel-content" class="p-3">
+                <div class="min-h-0">
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-1">
+                        <p>Population:</p><p class="text-right"><span id="population-stat" class="font-semibold text-white">0</span></p>
+                        <p>Day:</p><p class="text-right"><span id="day-stat" class="font-semibold text-white">0</span> (<span id="time-of-day-stat">Day</span>)</p>
+                        <p>Cities:</p><p class="text-right"><span id="cities-stat" class="font-semibold text-white">0</span></p>
                     </div>
+                    <div class="border-t border-slate-600 my-2"></div>
+                    <p>Families (<span id="families-count-stat">0</span>):</p>
+                    <div id="family-list-stat" class="text-right text-slate-300 text-xs italic pr-1">None</div>
                 </div>
             </div>
-            <button id="expand-stats-btn" class="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-slate-700 rounded-full p-1 border border-slate-600">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-300 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-            </button>
         </div>
         
         <div id="tool-panel" class="draggable flex flex-col gap-2" style="top: 50%; left: 1rem; transform: translateY(-50%);">
+             <button data-tool="bumble" title="Place Bumble" class="tool-btn control-btn from-purple-500 to-purple-700 text-white p-3 rounded-full w-12 h-12 flex items-center justify-center"><span class="material-icons-outlined text-2xl">person_add</span></button>
              <button data-tool="food" title="Place Food" class="tool-btn control-btn from-green-500 to-green-700 text-white p-3 rounded-full w-12 h-12 flex items-center justify-center"><span class="material-icons-outlined text-2xl">grass</span></button>
-             <button data-tool="wood" title="Place Wood" class="tool-btn control-btn from-yellow-600 to-yellow-800 text-white p-3 rounded-full w-12 h-12 flex items-center justify-center"><span class="material-icons-outlined text-2xl">forest</span></button>
+             <button data-tool="tree" title="Place Tree" class="tool-btn control-btn from-yellow-600 to-yellow-800 text-white p-3 rounded-full w-12 h-12 flex items-center justify-center"><span class="material-icons-outlined text-2xl">forest</span></button>
              <button data-tool="fire" title="Place Fire" class="tool-btn control-btn from-red-500 to-red-700 text-white p-3 rounded-full w-12 h-12 flex items-center justify-center"><span class="material-icons-outlined text-2xl">local_fire_department</span></button>
         </div>
 
@@ -182,28 +202,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const simulationContainer = document.getElementById('simulation-container');
     const playPauseBtn = document.getElementById('play-pause-btn'), playIcon = document.getElementById('play-icon'), pauseIcon = document.getElementById('pause-icon');
     const restartBtn = document.getElementById('restart-btn'), settingsBtn = document.getElementById('settings-btn'), zombieBtn = document.getElementById('zombie-btn');
-    const populationStat = document.getElementById('population-stat'), dayStat = document.getElementById('day-stat'), timeOfDayStat = document.getElementById('time-of-day-stat'), citiesStat = document.getElementById('cities-stat'), familiesStat = document.getElementById('families-stat'), deathsStat = document.getElementById('deaths-stat'), mutationsStat = document.getElementById('mutations-stat'), maxGenStat = document.getElementById('max-gen-stat'), avgIntelStat = document.getElementById('avg-intel-stat');
-    const statsPanel = document.getElementById('stats-panel'), expandStatsBtn = document.getElementById('expand-stats-btn'), statsDetailsWrapper = document.getElementById('stats-details-wrapper');
+    const populationStat = document.getElementById('population-stat'), dayStat = document.getElementById('day-stat'), timeOfDayStat = document.getElementById('time-of-day-stat'), citiesStat = document.getElementById('cities-stat'), familiesCountStat = document.getElementById('families-count-stat'), familyListStat = document.getElementById('family-list-stat');
+    const statsPanel = document.getElementById('stats-panel'), collapseStatsBtn = document.getElementById('collapse-stats-btn');
     const bumbleInfoModal = document.getElementById('bumble-info-modal'), closeInfoBtn = document.getElementById('close-info-btn'), bumbleName = document.getElementById('bumble-name'), bumbleGeneration = document.getElementById('bumble-generation'), bumbleGender = document.getElementById('bumble-gender'), bumbleAge = document.getElementById('bumble-age'), bumbleEnergyBar = document.getElementById('bumble-energy-bar'), bumbleOccupation = document.getElementById('bumble-occupation'), bumbleHolding = document.getElementById('bumble-holding');
     const settingsModal = document.getElementById('settings-modal'), closeSettingsBtn = document.getElementById('close-settings-btn'), initialPopSlider = document.getElementById('initial-pop-slider'), foodIntervalSlider = document.getElementById('food-interval-slider'), reproductionRateSlider = document.getElementById('reproduction-rate-slider'), mutationRateSlider = document.getElementById('mutation-rate-slider'), timeSpeedSlider = document.getElementById('time-speed-slider'), initialPopValue = document.getElementById('initial-pop-value'), foodIntervalValue = document.getElementById('food-interval-value'), reproductionRateValue = document.getElementById('reproduction-rate-value'), mutationRateValue = document.getElementById('mutation-rate-value'), timeSpeedValue = document.getElementById('time-speed-value');
     const toolBtns = document.querySelectorAll('.tool-btn');
     const startScreen = document.getElementById('start-screen');
 
-    // --- SIMULATION STATE & PARAMETERS ---
-    let bumbles = [], foods = [], resources = [], communities = [];
+    // --- SIMULATION & VIEW STATE ---
+    let bumbles = [], foods = [], resources = [], cities = [];
     let isRunning = false, animationFrameId, day = 0, frameCount = 0;
     const framesPerDay = 6000; 
     let timeOfDay = 'Day';
     let worldStats = { deaths: 0, mutations: 0 };
     let activeTool = null;
     let settings = { initialPopulation: 6, foodSpawnInterval: 100, reproductionUrge: 0.5, mutationChance: 0.05, timeMultiplier: 1 };
+    
+    let camera = { x: 0, y: 0, scale: 1, isPanning: false, lastPanX: 0, lastPanY: 0, lastTouchDist: 0 };
 
     // --- UTILITY & NAME FUNCTIONS ---
     const random = (min, max) => Math.random() * (max - min) + min;
     const getDistance = (x1, y1, x2, y2) => Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
     const maleNames = ["Liam", "Noah", "Oliver", "Elijah", "James"], femaleNames = ["Olivia", "Emma", "Charlotte", "Amelia", "Ava"], lastNames = ["Smith", "Jones", "Garcia", "Miller", "Davis"];
+    const cityPrefixes = ["Green", "Stone", "River", "Sun", "Moon"], citySuffixes = ["wood", "field", "dale", "crest", "ford"];
     const getRandomFirstName = (gender) => gender === 'male' ? maleNames[Math.floor(random(0, maleNames.length))] : femaleNames[Math.floor(random(0, femaleNames.length))];
     const getRandomLastName = () => lastNames[Math.floor(random(0, lastNames.length))];
+    const generateCityName = () => `${cityPrefixes[Math.floor(random(0, cityPrefixes.length))]} ${citySuffixes[Math.floor(random(0, citySuffixes.length))]}`;
 
     // --- CLASSES ---
     class WorldObject { constructor(x, y) { this.x = x; this.y = y; this.id = Math.random().toString(36).substr(2, 9); } }
@@ -211,14 +235,25 @@ document.addEventListener('DOMContentLoaded', () => {
         constructor(x, y) { super(x, y); this.radius = 4; this.energy = 50; this.pulse = random(0, Math.PI * 2); }
         draw() { this.pulse += 0.05; const glow = 8 + Math.sin(this.pulse) * 4; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fillStyle = 'rgba(134, 239, 172, 0.9)'; ctx.shadowColor = 'rgba(134, 239, 172, 0.8)'; ctx.shadowBlur = glow; ctx.fill(); ctx.shadowBlur = 0; }
     }
-    class Wood extends WorldObject {
-        constructor(x, y) { super(x, y); this.width = 15; this.height = 5; }
-        draw() { ctx.fillStyle = '#92400e'; ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height); }
-    }
     class Fire extends WorldObject {
         constructor(x, y) { super(x, y); this.radius = 15; this.damage = 0.5; this.particles = []; }
         update() { if (Math.random() < 0.8) this.particles.push({ x: this.x + random(-8, 8), y: this.y, life: 1, vx: random(-0.2, 0.2), vy: random(-1.5, -0.8), radius: random(2, 5) }); this.particles.forEach(p => { p.life -= 0.04; p.x += p.vx; p.y += p.vy; }); this.particles = this.particles.filter(p => p.life > 0); }
         draw() { this.particles.forEach(p => { ctx.beginPath(); const a = p.life, r = 255, g = Math.floor(255 * (p.life * 0.5 + 0.5)), b = 0; ctx.fillStyle = `rgba(${r},${g},${b},${a})`; ctx.arc(p.x, p.y, p.radius * p.life, 0, Math.PI * 2); ctx.fill(); }); }
+    }
+    class Tree extends WorldObject {
+        constructor(x, y) {
+            super(x, y);
+            this.radius = random(8, 12);
+            this.woodAmount = 3;
+        }
+        draw() {
+            ctx.fillStyle = '#8B4513';
+            ctx.fillRect(this.x - this.radius * 0.2, this.y, this.radius * 0.4, this.radius);
+            ctx.fillStyle = '#228B22';
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
     class Structure extends WorldObject {
         constructor(x, y, type) { super(x, y); this.type = type; this.buildProgress = 0; this.requiredWood = type === 'dwelling' ? 5 : 15; this.isComplete = false; }
@@ -236,11 +271,41 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.globalAlpha = 1;
         }
     }
-    class Community extends WorldObject {
-        constructor(x, y) { super(x, y); this.radius = 30; this.structures = []; this.constructionSite = null; }
+    class City extends WorldObject {
+        constructor(x, y) {
+            super(x, y);
+            this.name = generateCityName();
+            this.radius = 30;
+            this.structures = [];
+            this.constructionSite = null;
+            this.woodStockpile = 0;
+            this.foodStockpile = 0;
+        }
         planStructure() { if (this.constructionSite) return; const angle = random(0, Math.PI * 2); const dist = this.radius + 20; const type = this.structures.length % 5 === 4 ? 'monument' : 'dwelling'; this.constructionSite = new Structure(this.x + Math.cos(angle) * dist, this.y + Math.sin(angle) * dist, type); }
         buildStructure() { this.structures.push(this.constructionSite); this.constructionSite = null; }
-        draw() { ctx.strokeStyle = '#ca8a04'; ctx.fillStyle = 'rgba(202, 138, 4, 0.1)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.stroke(); ctx.fill(); this.structures.forEach(s => s.draw()); if (this.constructionSite) this.constructionSite.draw(); }
+        draw() {
+            ctx.strokeStyle = '#ca8a04';
+            ctx.fillStyle = 'rgba(202, 138, 4, 0.1)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fill();
+            this.structures.forEach(s => s.draw());
+            if (this.constructionSite) this.constructionSite.draw();
+            // Draw wood stockpile
+            for (let i = 0; i < this.woodStockpile; i++) {
+                ctx.fillStyle = '#92400e';
+                ctx.fillRect(this.x - 25 + (i % 5) * 6, this.y - 15 + Math.floor(i / 5) * 4, 5, 3);
+            }
+            // Draw food stockpile
+            for (let i = 0; i < this.foodStockpile; i++) {
+                ctx.fillStyle = '#4ade80';
+                ctx.beginPath();
+                ctx.arc(this.x + 22 - (i % 5) * 5, this.y - 13 + Math.floor(i/5) * 4, 2, 0, Math.PI*2);
+                ctx.fill();
+            }
+        }
     }
 
     class Bumble {
@@ -250,7 +315,8 @@ document.addEventListener('DOMContentLoaded', () => {
             this.firstName = getRandomFirstName(this.gender);
             this.lastName = null;
             this.x = x || random(20, canvas.width - 20); this.y = y || random(20, canvas.height - 20);
-            this.baseRadius = random(8, 12); this.radius = this.baseRadius;
+            this.baseRadius = 5;
+            this.radius = this.baseRadius;
             this.generation = generation;
             this.isZombie = false;
             this.color = this.gender === 'male' ? '#93c5fd' : '#f9a8d4';
@@ -258,19 +324,21 @@ document.addEventListener('DOMContentLoaded', () => {
             if (parentTraits) {
                 this.speed = this.mutate(parentTraits.speed);
                 this.perception = this.mutate(parentTraits.perception);
-                this.lifespan = this.mutate(parentTraits.lifespan, 50);
+                this.lifespan = this.mutate(parentTraits.lifespan, 2);
                 this.intelligence = this.mutate(parentTraits.intelligence, 5);
                 this.lastName = parentTraits.lastName;
             } else {
                 this.speed = random(0.5, 1.5);
                 this.perception = random(50, 150);
-                this.lifespan = random(40, 80);
+                this.lifespan = random(8, 12);
                 this.intelligence = random(1, 10);
             }
             
             this.age = 0; this.isDead = false; this.vx = 0; this.vy = 0;
             this.target = null; this.heldResource = null; this.reproductionCooldown = 0;
             this.isFounder = false;
+            this.isAdult = false;
+            this.smoothAngle = 0;
             this.needs = { hunger: 100, energy: 100 };
             this.state = 'wandering';
         }
@@ -286,6 +354,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         updateNeeds() {
+            if (this.isZombie && (timeOfDay === 'Day' || timeOfDay === 'Dawn')) {
+                this.needs.hunger -= 1.0;
+            }
             const baseMetabolism = 0.002;
             const activityCost = (Math.abs(this.vx) + Math.abs(this.vy)) * 0.001;
             const nightPenalty = timeOfDay === 'Night' ? 0.001 : 0;
@@ -302,17 +373,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
         updateState() {
             if (this.isZombie) { this.state = 'hunting'; return; }
+            
+            const nearestZombie = this.findClosest(bumbles.filter(b => b.isZombie), this.perception, false);
+            if (nearestZombie) { this.state = 'fleeing'; this.target = nearestZombie; return; }
+
             const founder = bumbles.find(b => b.isFounder);
             const fleeTarget = this.findClosest(resources.filter(r => r instanceof Fire), this.perception, false);
             if (fleeTarget) { this.state = 'fleeing'; this.target = fleeTarget; return; }
+            
             if (this.needs.hunger < 40) { this.state = 'seekingFood'; }
-            else if (this.needs.hunger > 80 && this.reproductionCooldown <= 0 && this.age > 10 && this.age < this.lifespan * 0.8 && Math.random() < settings.reproductionUrge) { this.state = 'seekingMate'; }
-            else if (day > 1 && this.intelligence > 15 && communities.length === 0) {
+            else if (this.isAdult && this.needs.hunger > 80 && this.reproductionCooldown <= 0 && this.age < this.lifespan * 0.8 && Math.random() < settings.reproductionUrge) { this.state = 'seekingMate'; }
+            else if (this.isAdult && day > 1 && this.intelligence > 15 && cities.length === 0) {
                 if (!founder && !this.isFounder) { this.state = 'planning'; } 
                 else if (founder && this.id !== founder.id) { this.state = 'assisting'; }
             }
-            else if (this.intelligence > 15 && !this.heldResource) { this.state = 'gathering'; }
-            else if (this.intelligence > 15 && this.heldResource === 'wood') { this.state = 'building'; }
+            else if (this.isAdult && this.intelligence > 15) {
+                if (this.heldResource === 'wood') { this.state = 'depositingWood'; } 
+                else if (this.heldResource === 'food') { this.state = 'depositingFood'; }
+                else if (!this.heldResource) {
+                    const nearestCity = this.findClosest(cities, this.perception * 2, false);
+                    if (nearestCity) {
+                        if (nearestCity.constructionSite && nearestCity.woodStockpile > 0) { this.state = 'building'; }
+                        else if (Math.random() > 0.5) { this.state = 'harvesting'; }
+                        else { this.state = 'foraging'; }
+                    } else { this.state = 'wandering'; }
+                }
+            }
             else if (this.state !== 'wandering') { this.state = 'wandering'; }
         }
         
@@ -320,23 +406,31 @@ document.addEventListener('DOMContentLoaded', () => {
             this.target = null;
             switch (this.state) {
                 case 'hunting':
-                    const prey = bumbles.filter(b => !b.isZombie && !b.isDead);
-                    this.findClosest(prey, this.perception * 2, true);
+                    this.findClosest(bumbles.filter(b => !b.isZombie && !b.isDead), this.perception * 2, true);
                     break;
                 case 'seekingFood':
-                    this.findClosest(foods, this.perception, true);
+                    const nearestCityWithFood = this.findClosest(cities.filter(c => c.foodStockpile > 0), this.perception * 2, false);
+                    if (nearestCityWithFood) { this.target = nearestCityWithFood; } 
+                    else { this.findClosest(foods, this.perception, true); }
                     break;
                 case 'seekingMate':
-                    const potentialMates = bumbles.filter(b => b.id !== this.id && b.gender !== this.gender && !b.isDead && b.reproductionCooldown <= 0 && b.age > 10);
+                    const potentialMates = bumbles.filter(b => b.id !== this.id && b.isAdult && b.gender !== this.gender && !b.isDead && b.reproductionCooldown <= 0);
                     this.findClosest(potentialMates, this.perception, true);
                     break;
-                case 'gathering':
-                    this.findClosest(resources.filter(r => r instanceof Wood), this.perception * 1.5, true);
+                case 'harvesting':
+                    this.findClosest(resources.filter(r => r instanceof Tree), this.perception * 1.5, true);
+                    break;
+                case 'foraging':
+                    this.findClosest(foods, this.perception * 1.5, true);
+                    break;
+                case 'depositingWood':
+                case 'depositingFood':
+                    this.findClosest(cities, this.perception * 2, true);
                     break;
                 case 'building':
-                    const constructionSites = communities.map(c => c.constructionSite).filter(Boolean);
-                    if (constructionSites.length > 0) this.findClosest(constructionSites, this.perception * 2, true);
-                    else this.state = 'wandering';
+                    const nearestCity = this.findClosest(cities, this.perception * 2, false);
+                    if (nearestCity && nearestCity.constructionSite) { this.target = nearestCity; } 
+                    else { this.state = 'wandering'; }
                     break;
                 case 'planning':
                     this.isFounder = true; this.vx = 0; this.vy = 0;
@@ -356,6 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
         findClosest(targets, range, setTarget = true) {
             let closest = null, minDist = range;
             for (const t of targets) {
+                if (!t || t.isDead) continue;
                 const d = getDistance(this.x, this.y, t.x, t.y);
                 if (d < minDist) { minDist = d; closest = t; }
             }
@@ -366,6 +461,10 @@ document.addEventListener('DOMContentLoaded', () => {
         update() {
             if (this.isDead) return;
             this.age += 1 / framesPerDay;
+            if (!this.isAdult && this.age > 2) {
+                this.isAdult = true;
+                this.baseRadius = random(8, 12);
+            }
             this.updateNeeds();
             if (this.needs.hunger <= 0 || this.age >= this.lifespan) { this.die(); return; }
             if (this.reproductionCooldown > 0) this.reproductionCooldown--;
@@ -391,6 +490,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (this.x < this.radius || this.x > canvas.width - this.radius) this.vx *= -1;
             if (this.y < this.radius || this.y > canvas.height - this.radius) this.vy *= -1;
 
+            this.radius = this.baseRadius + Math.sin(frameCount * 0.1) * 0.5;
             let targetAngle = Math.atan2(this.vy, this.vx);
             if (Math.abs(this.vx) < 0.1 && Math.abs(this.vy) < 0.1) targetAngle = this.smoothAngle || 0;
             let angleDiff = targetAngle - (this.smoothAngle || 0);
@@ -400,7 +500,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         reproduce(partner) {
-            if (this.isZombie || partner.isZombie) return;
+            if (this.isZombie || partner.isZombie || !this.isAdult || !partner.isAdult) return;
             if (this.needs.hunger > 60 && partner.needs.hunger > 60 && this.reproductionCooldown <= 0 && partner.reproductionCooldown <= 0) {
                 const energyCost = 30;
                 const cooldown = 500;
@@ -426,7 +526,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.stroke();
             }
             ctx.fill();
-
+            if (this.heldResource === 'wood') {
+                ctx.fillStyle = '#92400e';
+                ctx.fillRect(this.x - 5, this.y - this.radius - 5, 10, 5);
+            } else if (this.heldResource === 'food') {
+                ctx.fillStyle = '#4ade80';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y - this.radius - 3, 3, 0, Math.PI*2);
+                ctx.fill();
+            }
             const angle = this.smoothAngle || 0;
             const eye1X = this.x + Math.cos(angle - 0.6) * this.radius * 0.5, eye1Y = this.y + Math.sin(angle - 0.6) * this.radius * 0.5;
             const eye2X = this.x + Math.cos(angle + 0.6) * this.radius * 0.5, eye2Y = this.y + Math.sin(angle + 0.6) * this.radius * 0.5;
@@ -445,8 +553,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- SIMULATION CORE LOGIC ---
     function init() {
         const container = document.getElementById('simulation-container'); canvas.width = container.clientWidth; canvas.height = container.clientHeight;
-        bumbles = []; foods = []; resources = []; communities = []; day = 0; frameCount = 0; worldStats = { deaths: 0, mutations: 0 };
+        bumbles = []; foods = []; resources = []; cities = []; day = 0; frameCount = 0; worldStats = { deaths: 0, mutations: 0 };
         for (let i = 0; i < settings.initialPopulation; i++) bumbles.push(new Bumble());
+        camera.x = canvas.width / 2;
+        camera.y = canvas.height / 2;
+        camera.scale = 1;
         updateDayNightCycle(true);
     }
 
@@ -470,42 +581,85 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    function checkCommunityFormation() {
-        if (communities.length > 0) return;
+    function checkCityFormation() {
+        if (cities.length > 0) return;
         const founder = bumbles.find(b => b.isFounder);
         if (founder) {
             const assistants = bumbles.filter(b => b.id !== founder.id && getDistance(b.x, b.y, founder.x, founder.y) < 30);
             if (assistants.length >= 2) {
-                communities.push(new Community(founder.x, founder.y));
+                cities.push(new City(founder.x, founder.y));
                 founder.isFounder = false;
-                founder.state = 'gathering';
-                assistants.forEach(a => a.state = 'gathering');
+                founder.state = 'harvesting';
+                assistants.forEach(a => a.state = 'harvesting');
             }
         }
     }
 
     function updateSimulation() {
-        if (frameCount % settings.foodSpawnInterval === 0) foods.push(new Food(random(10, canvas.width - 10), random(10, canvas.height - 10)));
-        if (frameCount % 1000 === 0 && Math.random() < 0.1 * communities.length) { const c = communities[Math.floor(random(0, communities.length))]; if (c) c.planStructure(); }
+        if (frameCount % settings.foodSpawnInterval === 0) foods.push(new Food(random(0, canvas.width), random(0, canvas.height)));
+        if (frameCount % 500 === 0) resources.push(new Tree(random(0, canvas.width), random(0, canvas.height)));
         
         bumbles.forEach(b => b.update());
-        if (frameCount % 10 === 0) checkCommunityFormation();
+        if (frameCount % 10 === 0) checkCityFormation();
 
-        for (let i = 0; i < bumbles.length; i++) {
-            const b1 = bumbles[i];
-            if (b1.isDead) continue;
-            for (let j = foods.length - 1; j >= 0; j--) { if (getDistance(b1.x, b1.y, foods[j].x, foods[j].y) < b1.radius) { b1.needs.hunger = Math.min(100, b1.needs.hunger + foods[j].energy); foods.splice(j, 1); b1.target = null; } }
-            for (let j = resources.length - 1; j >= 0; j--) { const r = resources[j]; if (r instanceof Wood && getDistance(b1.x, b1.y, r.x, r.y) < b1.radius && !b1.heldResource) { b1.heldResource = 'wood'; resources.splice(j, 1); b1.target = null; } }
-            for (const r of resources) { if (r instanceof Fire && getDistance(b1.x, b1.y, r.x, r.y) < b1.radius + r.radius) { b1.needs.hunger -= r.damage; } }
-            communities.forEach(c => { if (c.constructionSite && getDistance(b1.x, b1.y, c.constructionSite.x, c.constructionSite.y) < b1.radius && b1.heldResource) { b1.heldResource = null; c.constructionSite.addWood(); b1.intelligence += 0.2; if (c.constructionSite.isComplete) c.buildStructure(); b1.target = null; } });
+        for (let i = bumbles.length - 1; i >= 0; i--) {
+            const b = bumbles[i];
+            if (b.isDead) continue;
             
+            // Resource & Food Interactions
+            for (let j = foods.length - 1; j >= 0; j--) { 
+                if (getDistance(b.x, b.y, foods[j].x, foods[j].y) < b.radius) { 
+                    if (b.state === 'seekingFood') {
+                        b.needs.hunger = Math.min(100, b.needs.hunger + foods[j].energy);
+                    } else if (b.state === 'foraging' && !b.heldResource) {
+                        b.heldResource = 'food';
+                    }
+                    b.target = null; 
+                    foods.splice(j, 1);
+                    break; 
+                } 
+            }
+            for (let j = resources.length - 1; j >= 0; j--) {
+                const r = resources[j];
+                if (r instanceof Tree && getDistance(b.x, b.y, r.x, r.y) < b.radius + r.radius && !b.heldResource && b.state === 'harvesting') {
+                    r.woodAmount--;
+                    b.heldResource = 'wood';
+                    if (r.woodAmount <= 0) resources.splice(j, 1);
+                    b.target = null;
+                }
+            }
+            // City Interactions
+            for (let j = cities.length - 1; j >= 0; j--) {
+                const c = cities[j];
+                if (getDistance(b.x, b.y, c.x, c.y) < c.radius) {
+                    if (b.heldResource === 'wood' && b.state === 'depositingWood') {
+                        c.woodStockpile++; b.heldResource = null; b.target = null;
+                    } else if (b.heldResource === 'food' && b.state === 'depositingFood') {
+                        c.foodStockpile++; b.heldResource = null; b.target = null;
+                    } else if (b.state === 'seekingFood' && c.foodStockpile > 0) {
+                        c.foodStockpile--; b.needs.hunger = 100; b.target = null; b.state = 'wandering';
+                    } else if (b.state === 'building' && !b.heldResource && c.woodStockpile > 0) {
+                        c.woodStockpile--; b.heldResource = 'wood'; b.target = c.constructionSite;
+                    }
+                }
+                
+                if (c.constructionSite && getDistance(b.x, b.y, c.constructionSite.x, c.constructionSite.y) < b.radius && b.heldResource === 'wood') {
+                    b.heldResource = null;
+                    c.constructionSite.addWood();
+                    b.intelligence += 0.2;
+                    if (c.constructionSite.isComplete) c.buildStructure();
+                    b.target = null;
+                }
+            }
+
+            // Bumble-Bumble Interactions
             for (let j = i + 1; j < bumbles.length; j++) {
                 const b2 = bumbles[j];
                 if (b2.isDead) continue;
-                if (getDistance(b1.x, b1.y, b2.x, b2.y) < b1.radius + b2.radius) {
-                    if (b1.isZombie && !b2.isZombie) b2.isZombie = true;
-                    if (b2.isZombie && !b1.isZombie) b1.isZombie = true;
-                    if (!b1.isZombie && !b2.isZombie && b1.gender !== b2.gender) b1.reproduce(b2);
+                if (getDistance(b.x, b.y, b2.x, b2.y) < b.radius + b2.radius) {
+                    if (b.isZombie && !b2.isZombie) b2.isZombie = true;
+                    if (b2.isZombie && !b.isZombie) b.isZombie = true;
+                    if (!b.isZombie && !b2.isZombie && b.gender !== b2.gender) b.reproduce(b2);
                 }
             }
         }
@@ -516,11 +670,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function drawSimulation() {
+        ctx.save();
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.translate(camera.x, camera.y);
+        ctx.scale(camera.scale, camera.scale);
+        
         foods.forEach(f => f.draw());
         resources.forEach(r => { if (r.update) r.update(); r.draw(); });
-        communities.forEach(c => c.draw());
+        cities.forEach(c => c.draw());
         bumbles.forEach(b => b.draw());
+        
+        ctx.restore();
     }
 
     function animate() {
@@ -535,17 +695,18 @@ document.addEventListener('DOMContentLoaded', () => {
         populationStat.textContent = bumbles.length;
         dayStat.textContent = Math.floor(day);
         timeOfDayStat.textContent = timeOfDay;
-        citiesStat.textContent = communities.length;
-        const familyNames = new Set(bumbles.filter(b => b.lastName).map(b => b.lastName));
-        familiesStat.textContent = familyNames.size;
-        deathsStat.textContent = worldStats.deaths;
-        mutationsStat.textContent = worldStats.mutations;
-        maxGenStat.textContent = bumbles.reduce((max, b) => Math.max(max, b.generation), 0);
-        avgIntelStat.textContent = bumbles.length > 0 ? (bumbles.reduce((acc, b) => acc + b.intelligence, 0) / bumbles.length).toFixed(1) : '0';
+        citiesStat.textContent = cities.length;
+        const familyNames = [...new Set(bumbles.filter(b => b.lastName).map(b => b.lastName))];
+        familiesCountStat.textContent = familyNames.length;
+        if (familyNames.length > 0) {
+            familyListStat.innerHTML = familyNames.sort().join('<br>');
+        } else {
+            familyListStat.textContent = 'None';
+        }
     }
 
     function makeDraggable(panel) {
-        const handle = panel.querySelector('.drag-handle') || panel;
+        const handle = panel.querySelector('.drag-handle');
         let isDragging = false;
         let offsetX, offsetY;
         handle.addEventListener('mousedown', (e) => {
@@ -581,11 +742,8 @@ document.addEventListener('DOMContentLoaded', () => {
         playIcon.classList.toggle('hidden');
         pauseIcon.classList.toggle('hidden');
         playPauseBtn.classList.toggle('paused');
-        if (isRunning) {
-            animate();
-        } else {
-            cancelAnimationFrame(animationFrameId);
-        }
+        if (isRunning) animate();
+        else cancelAnimationFrame(animationFrameId);
     }
 
     function showBumbleInfo(bumble) {
@@ -593,7 +751,7 @@ document.addEventListener('DOMContentLoaded', () => {
         bumbleGeneration.textContent = bumble.generation;
         bumbleGender.textContent = bumble.gender.charAt(0).toUpperCase() + bumble.gender.slice(1);
         bumbleGender.style.color = bumble.gender === 'male' ? '#93c5fd' : '#f9a8d4';
-        bumbleAge.textContent = `${bumble.age.toFixed(1)} / ${bumble.lifespan.toFixed(1)} days`; 
+        bumbleAge.textContent = `${bumble.age.toFixed(1)} / ${bumble.lifespan.toFixed(0)} days`; 
         bumbleEnergyBar.style.width = `${bumble.needs.hunger}%`;
         bumbleOccupation.textContent = bumble.state.charAt(0).toUpperCase() + bumble.state.slice(1);
         bumbleHolding.textContent = bumble.heldResource || 'Nothing';
@@ -603,7 +761,7 @@ document.addEventListener('DOMContentLoaded', () => {
     startScreen.addEventListener('click', () => {
         startScreen.style.opacity = '0';
         setTimeout(() => startScreen.style.display = 'none', 500);
-        togglePlayPause();
+        if (!isRunning) togglePlayPause();
     }, { once: true });
 
     playPauseBtn.addEventListener('click', togglePlayPause);
@@ -613,15 +771,16 @@ document.addEventListener('DOMContentLoaded', () => {
     
     zombieBtn.addEventListener('click', () => {
         if (!isRunning) return;
-        const newZombie = new Bumble(random(20, canvas.width - 20), random(20, canvas.height - 20));
+        const worldPos = screenToWorld(canvas.width / 2, canvas.height / 2);
+        const newZombie = new Bumble(worldPos.x, worldPos.y);
         newZombie.isZombie = true;
         bumbles.push(newZombie);
     });
 
-    expandStatsBtn.addEventListener('click', (e) => {
+    collapseStatsBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const isExpanded = statsDetailsWrapper.classList.toggle('grid-rows-[1fr]');
-        expandStatsBtn.querySelector('svg').style.transform = isExpanded ? 'rotate(180deg)' : 'rotate(0deg)';
+        statsPanel.classList.toggle('collapsed');
+        collapseStatsBtn.querySelector('svg').style.transform = statsPanel.classList.contains('collapsed') ? 'rotate(180deg)' : 'rotate(0deg)';
     });
     
     initialPopSlider.addEventListener('input', (e) => { settings.initialPopulation = parseInt(e.target.value); initialPopValue.textContent = e.target.value; });
@@ -633,16 +792,116 @@ document.addEventListener('DOMContentLoaded', () => {
     toolBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             const tool = btn.dataset.tool;
-            if (activeTool === tool) { activeTool = null; btn.classList.remove('active'); canvas.style.cursor = 'default'; }
+            if (activeTool === tool) { activeTool = null; btn.classList.remove('active'); canvas.style.cursor = 'grab'; }
             else { activeTool = tool; toolBtns.forEach(b => b.classList.remove('active')); btn.classList.add('active'); canvas.style.cursor = 'copy'; }
         });
     });
 
-    canvas.addEventListener('click', (event) => {
-        const rect = canvas.getBoundingClientRect(); const x = event.clientX - rect.left, y = event.clientY - rect.top;
-        if (activeTool) { if (activeTool === 'food') foods.push(new Food(x, y)); if (activeTool === 'wood') resources.push(new Wood(x, y)); if (activeTool === 'fire') resources.push(new Fire(x, y)); return; }
-        let clickedBumble = null; for (const bumble of bumbles) { if (getDistance(x, y, bumble.x, bumble.y) < bumble.radius) { clickedBumble = bumble; break; } }
+    function screenToWorld(x, y) {
+        return {
+            x: (x - camera.x) / camera.scale,
+            y: (y - camera.y) / camera.scale
+        };
+    }
+
+    canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const zoomIntensity = 0.1;
+        const wheel = e.deltaY < 0 ? 1 : -1;
+        const zoom = Math.exp(wheel * zoomIntensity);
+        const mousePos = { x: e.clientX, y: e.clientY };
+        camera.x = mousePos.x - (mousePos.x - camera.x) * zoom;
+        camera.y = mousePos.y - (mousePos.y - camera.y) * zoom;
+        camera.scale *= zoom;
+        camera.scale = Math.max(0.2, Math.min(3, camera.scale));
+        if (!isRunning) drawSimulation();
+    }, { passive: false });
+
+    let panStart = { x: 0, y: 0 };
+    canvas.addEventListener('mousedown', (e) => {
+        panStart.x = e.clientX;
+        panStart.y = e.clientY;
+        const worldPos = screenToWorld(e.clientX, e.clientY);
+        const clickedBumble = bumbles.find(b => getDistance(worldPos.x, worldPos.y, b.x, b.y) < b.radius);
+        if (!clickedBumble && !activeTool) {
+            camera.isPanning = true;
+            camera.lastPanX = e.clientX;
+            camera.lastPanY = e.clientY;
+        }
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+        if (camera.isPanning) {
+            const dx = e.clientX - camera.lastPanX;
+            const dy = e.clientY - camera.lastPanY;
+            camera.x += dx;
+            camera.y += dy;
+            camera.lastPanX = e.clientX;
+            camera.lastPanY = e.clientY;
+            if (!isRunning) drawSimulation();
+        }
+    });
+
+    canvas.addEventListener('mouseup', (e) => {
+        camera.isPanning = false;
+        const dist = getDistance(panStart.x, panStart.y, e.clientX, e.clientY);
+        if (dist > 5) return; // It was a drag, not a click
+
+        const worldPos = screenToWorld(e.clientX, e.clientY);
+        if (activeTool) {
+            if (activeTool === 'food') foods.push(new Food(worldPos.x, worldPos.y));
+            if (activeTool === 'tree') resources.push(new Tree(worldPos.x, worldPos.y));
+            if (activeTool === 'fire') resources.push(new Fire(worldPos.x, worldPos.y));
+            if (activeTool === 'bumble') bumbles.push(new Bumble(worldPos.x, worldPos.y));
+            if (!isRunning) drawSimulation();
+            return;
+        }
+        
+        const clickedBumble = bumbles.find(b => getDistance(worldPos.x, worldPos.y, b.x, b.y) < b.radius);
         if (clickedBumble) showBumbleInfo(clickedBumble);
+    });
+    canvas.addEventListener('mouseleave', () => { camera.isPanning = false; });
+
+    canvas.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+            camera.isPanning = true;
+            camera.lastPanX = e.touches[0].clientX;
+            camera.lastPanY = e.touches[0].clientY;
+        } else if (e.touches.length === 2) {
+            camera.isPanning = false;
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            camera.lastTouchDist = Math.sqrt(dx * dx + dy * dy);
+        }
+    });
+
+    canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (e.touches.length === 1 && camera.isPanning) {
+            const dx = e.touches[0].clientX - camera.lastPanX;
+            const dy = e.touches[0].clientY - camera.lastPanY;
+            camera.x += dx;
+            camera.y += dy;
+            camera.lastPanX = e.touches[0].clientX;
+            camera.lastPanY = e.touches[0].clientY;
+        } else if (e.touches.length === 2) {
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            const currentDist = Math.sqrt(dx * dx + dy * dy);
+            const zoom = currentDist / camera.lastTouchDist;
+            const touchMidpoint = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 };
+            camera.x = touchMidpoint.x - (touchMidpoint.x - camera.x) * zoom;
+            camera.y = touchMidpoint.y - (touchMidpoint.y - camera.y) * zoom;
+            camera.scale *= zoom;
+            camera.scale = Math.max(0.2, Math.min(3, camera.scale));
+            camera.lastTouchDist = currentDist;
+        }
+        if (!isRunning) drawSimulation();
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', () => {
+        camera.isPanning = false;
+        camera.lastTouchDist = 0;
     });
 
     closeInfoBtn.addEventListener('click', () => bumbleInfoModal.classList.remove('visible'));
@@ -667,7 +926,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Initial Setup
+    // --- Initial Setup ---
     init();
     drawSimulation();
     updateUI();
