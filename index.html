@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bumbles</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons|Material+Icons+Outlined" rel="stylesheet">
+    <style>
+        :root {
+            --sky-top: #0c4a6e;
+            --sky-horizon: #38bdf8;
+            --ground-color: #1e293b;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #020617;
+            color: #e2e8f0;
+            overscroll-behavior: none;
+        }
+        #simulation-container {
+            transition: background 2s ease-in-out;
+        }
+        .glassmorphism {
+            background: rgba(30, 41, 59, 0.5);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(71, 85, 105, 0.5);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        .control-btn {
+            transition: all 0.3s ease;
+            border: 1px solid transparent;
+            background-image: linear-gradient(to bottom right, var(--tw-gradient-stops));
+            box-shadow: 0 0 8px rgba(59, 130, 246, 0.3), 0 0 15px rgba(59, 130, 246, 0.2), inset 0 1px 1px 0 rgba(255,255,255,0.1);
+        }
+        .control-btn:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.6), 0 0 40px rgba(59, 130, 246, 0.4), inset 0 1px 1px 0 rgba(255,255,255,0.2);
+            border-color: rgba(96, 165, 250, 0.5);
+        }
+        .control-btn:active { transform: translateY(-1px) scale(1.02); }
+        .control-btn.active {
+             border-color: rgba(96, 165, 250, 0.8);
+             transform: translateY(1px) scale(0.98);
+             box-shadow: inset 0 3px 7px rgba(0,0,0,0.4), 0 0 10px rgba(59, 130, 246, 0.6);
+        }
+        #play-pause-btn.paused { animation: pulse 2s infinite; }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 8px rgba(59, 130, 246, 0.3), 0 0 15px rgba(59, 130, 246, 0.2); }
+            50% { transform: scale(1.05); box-shadow: 0 0 20px rgba(59, 130, 246, 0.6), 0 0 40px rgba(59, 130, 246, 0.4); }
+        }
+        .modal-enter { animation: fadeInScale 0.4s cubic-bezier(0.165, 0.840, 0.440, 1.000) forwards; }
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: scale(0.92); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .modal-wrapper {
+            transition: opacity 0.3s ease, visibility 0.3s;
+            opacity: 0;
+            visibility: hidden;
+        }
+        .modal-wrapper.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: default; }
+        #bumble-energy-bar { transition: width 0.5s ease-in-out; }
+        .draggable {
+            position: absolute;
+            z-index: 10;
+            user-select: none;
+        }
+        .drag-handle {
+            cursor: grab;
+            padding: 4px;
+            background-color: rgba(71, 85, 105, 0.5);
+            border-bottom: 1px solid rgba(71, 85, 105, 0.8);
+        }
+        .drag-handle:active { cursor: grabbing; }
+        #start-screen {
+            transition: opacity 0.5s ease-out;
+        }
+    </style>
+</head>
+<body class="overflow-hidden h-screen w-screen flex items-center justify-center">
+
+    <div id="simulation-container" class="relative w-full h-full">
+        <canvas id="simulationCanvas"></canvas>
+
+        <!-- UI Panels -->
+        <div id="stats-panel" class="draggable glassmorphism rounded-lg text-xs md:text-sm w-48" style="top: 1rem; right: 1rem;">
+            <div class="drag-handle rounded-t-lg text-center text-slate-300 font-bold">Statistics</div>
+            <div class="p-3">
+                <div class="grid grid-cols-2 gap-x-4 gap-y-1">
+                    <p>Population:</p><p class="text-right"><span id="population-stat" class="font-semibold text-white">0</span></p>
+                    <p>Day:</p><p class="text-right"><span id="day-stat" class="font-semibold text-white">0</span> (<span id="time-of-day-stat">Day</span>)</p>
+                    <p>Cities:</p><p class="text-right"><span id="cities-stat" class="font-semibold text-white">0</span></p>
+                    <p>Families:</p><p class="text-right"><span id="families-stat" class="font-semibold text-white">0</span></p>
+                </div>
+                <div id="stats-details-wrapper" class="overflow-hidden transition-[grid-template-rows] duration-500 ease-in-out grid grid-rows-[0fr]">
+                    <div class="min-h-0">
+                        <div class="border-t border-slate-600 my-2"></div>
+                        <div class="grid grid-cols-2 gap-x-4 gap-y-1">
+                           <p>Deaths:</p><p class="text-right"><span id="deaths-stat" class="font-semibold text-white">0</span></p>
+                           <p>Mutations:</p><p class="text-right"><span id="mutations-stat" class="font-semibold text-white">0</span></p>
+                           <p>Max Gen:</p><p class="text-right"><span id="max-gen-stat" class="font-semibold text-white">0</span></p>
+                           <p>Avg. Intel:</p><p class="text-right"><span id="avg-intel-stat" class="font-semibold text-white">0</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <button id="expand-stats-btn" class="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-slate-700 rounded-full p-1 border border-slate-600">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-300 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+            </button>
+        </div>
+        
+        <div id="tool-panel" class="draggable flex flex-col gap-2" style="top: 50%; left: 1rem; transform: translateY(-50%);">
+             <button data-tool="food" title="Place Food" class="tool-btn control-btn from-green-500 to-green-700 text-white p-3 rounded-full w-12 h-12 flex items-center justify-center"><span class="material-icons-outlined text-2xl">grass</span></button>
+             <button data-tool="wood" title="Place Wood" class="tool-btn control-btn from-yellow-600 to-yellow-800 text-white p-3 rounded-full w-12 h-12 flex items-center justify-center"><span class="material-icons-outlined text-2xl">forest</span></button>
+             <button data-tool="fire" title="Place Fire" class="tool-btn control-btn from-red-500 to-red-700 text-white p-3 rounded-full w-12 h-12 flex items-center justify-center"><span class="material-icons-outlined text-2xl">local_fire_department</span></button>
+        </div>
+
+        <!-- Bottom Control Bar -->
+        <div class="absolute bottom-0 left-0 right-0 p-4 flex justify-center items-center gap-2 z-10">
+            <button id="restart-btn" title="Restart" class="control-btn from-slate-600 to-slate-800 text-white font-bold p-3 rounded-full w-14 h-14 flex items-center justify-center"><span class="material-icons-outlined text-3xl">restart_alt</span></button>
+            <button id="play-pause-btn" class="control-btn from-blue-500 to-blue-700 text-white font-bold p-3 rounded-full w-16 h-16 flex items-center justify-center paused">
+                <span id="play-icon" class="material-icons text-5xl">play_arrow</span>
+                <span id="pause-icon" class="material-icons text-5xl hidden">pause</span>
+            </button>
+            <button id="zombie-btn" title="Spawn Zombie" class="control-btn from-green-700 to-green-900 text-white font-bold p-3 rounded-full w-14 h-14 flex items-center justify-center"><span class="material-icons text-3xl">coronavirus</span></button>
+            <button id="settings-btn" title="Settings" class="control-btn from-slate-600 to-slate-800 text-white font-bold p-3 rounded-full w-14 h-14 flex items-center justify-center"><span class="material-icons-outlined text-3xl">settings</span></button>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="bumble-info-modal" class="modal-wrapper absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center z-20 p-4">
+        <div class="glassmorphism rounded-2xl w-full max-w-sm p-6 text-center modal-enter">
+            <h2 id="bumble-name" class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-400 to-blue-400 mb-1"></h2>
+            <p class="text-slate-400 mb-4">Generation <span id="bumble-generation"></span></p>
+            <div class="grid grid-cols-2 gap-4 text-left">
+                <div class="bg-slate-900/50 p-3 rounded-lg"><p class="text-xs text-slate-400">Gender</p><p id="bumble-gender" class="font-semibold text-lg"></p></div>
+                <div class="bg-slate-900/50 p-3 rounded-lg"><p class="text-xs text-slate-400">Age</p><p id="bumble-age" class="font-semibold text-lg"></p></div>
+                <div class="bg-slate-900/50 p-3 rounded-lg col-span-2"><p class="text-xs text-slate-400">Hunger</p><div class="w-full bg-slate-700 rounded-full h-2.5 mt-1"><div id="bumble-energy-bar" class="bg-green-500 h-2.5 rounded-full"></div></div></div>
+                <div class="bg-slate-900/50 p-3 rounded-lg"><p class="text-xs text-slate-400">Current State</p><p id="bumble-occupation" class="font-semibold"></p></div>
+                <div class="bg-slate-900/50 p-3 rounded-lg"><p class="text-xs text-slate-400">Holding</p><p id="bumble-holding" class="font-semibold"></p></div>
+            </div>
+            <button id="close-info-btn" class="mt-6 w-full bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-500 hover:to-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300">Close</button>
+        </div>
+    </div>
+    <div id="settings-modal" class="modal-wrapper absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center z-20 p-4">
+        <div class="glassmorphism rounded-2xl w-full max-w-sm p-6 modal-enter">
+            <h2 class="text-2xl font-bold text-white mb-4">Simulation Settings</h2>
+            <div class="space-y-4">
+                <div><label for="initial-pop-slider" class="block mb-1 text-sm font-medium text-slate-300">Initial Population: <span id="initial-pop-value">6</span></label><input id="initial-pop-slider" type="range" min="2" max="100" value="6" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"></div>
+                <div><label for="food-interval-slider" class="block mb-1 text-sm font-medium text-slate-300">Food Spawn Rate: <span id="food-interval-value">100</span></label><input id="food-interval-slider" type="range" min="10" max="500" value="100" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"></div>
+                <div><label for="reproduction-rate-slider" class="block mb-1 text-sm font-medium text-slate-300">Reproduction Urge: <span id="reproduction-rate-value">50</span>%</label><input id="reproduction-rate-slider" type="range" min="0" max="100" value="50" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"></div>
+                <div><label for="mutation-rate-slider" class="block mb-1 text-sm font-medium text-slate-300">Mutation Chance: <span id="mutation-rate-value">5</span>%</label><input id="mutation-rate-slider" type="range" min="0" max="50" value="5" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"></div>
+                <div><label for="time-speed-slider" class="block mb-1 text-sm font-medium text-slate-300">Time Speed: <span id="time-speed-value">1</span>x</label><input id="time-speed-slider" type="range" min="1" max="10" value="1" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"></div>
+            </div>
+            <p class="text-xs text-slate-400 mt-4">Population/Rate changes apply on restart.</p>
+            <button id="close-settings-btn" class="mt-4 w-full bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-500 hover:to-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300">Close</button>
+        </div>
+    </div>
+
+    <!-- Start Screen -->
+    <div id="start-screen" class="absolute inset-0 bg-black bg-opacity-80 z-30 flex items-center justify-center cursor-pointer">
+        <div class="text-center">
+            <h1 class="text-4xl font-bold text-amber-300 animate-pulse">Do not overfeed the bumbles</h1>
+            <p class="text-slate-300 mt-2">- you have been warned! -</p>
+            <p class="text-slate-400 mt-8 text-lg">(tap to start)</p>
+        </div>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- DOM ELEMENT SELECTION ---
+    const canvas = document.getElementById('simulationCanvas'), ctx = canvas.getContext('2d');
+    const simulationContainer = document.getElementById('simulation-container');
+    const playPauseBtn = document.getElementById('play-pause-btn'), playIcon = document.getElementById('play-icon'), pauseIcon = document.getElementById('pause-icon');
+    const restartBtn = document.getElementById('restart-btn'), settingsBtn = document.getElementById('settings-btn'), zombieBtn = document.getElementById('zombie-btn');
+    const populationStat = document.getElementById('population-stat'), dayStat = document.getElementById('day-stat'), timeOfDayStat = document.getElementById('time-of-day-stat'), citiesStat = document.getElementById('cities-stat'), familiesStat = document.getElementById('families-stat'), deathsStat = document.getElementById('deaths-stat'), mutationsStat = document.getElementById('mutations-stat'), maxGenStat = document.getElementById('max-gen-stat'), avgIntelStat = document.getElementById('avg-intel-stat');
+    const statsPanel = document.getElementById('stats-panel'), expandStatsBtn = document.getElementById('expand-stats-btn'), statsDetailsWrapper = document.getElementById('stats-details-wrapper');
+    const bumbleInfoModal = document.getElementById('bumble-info-modal'), closeInfoBtn = document.getElementById('close-info-btn'), bumbleName = document.getElementById('bumble-name'), bumbleGeneration = document.getElementById('bumble-generation'), bumbleGender = document.getElementById('bumble-gender'), bumbleAge = document.getElementById('bumble-age'), bumbleEnergyBar = document.getElementById('bumble-energy-bar'), bumbleOccupation = document.getElementById('bumble-occupation'), bumbleHolding = document.getElementById('bumble-holding');
+    const settingsModal = document.getElementById('settings-modal'), closeSettingsBtn = document.getElementById('close-settings-btn'), initialPopSlider = document.getElementById('initial-pop-slider'), foodIntervalSlider = document.getElementById('food-interval-slider'), reproductionRateSlider = document.getElementById('reproduction-rate-slider'), mutationRateSlider = document.getElementById('mutation-rate-slider'), timeSpeedSlider = document.getElementById('time-speed-slider'), initialPopValue = document.getElementById('initial-pop-value'), foodIntervalValue = document.getElementById('food-interval-value'), reproductionRateValue = document.getElementById('reproduction-rate-value'), mutationRateValue = document.getElementById('mutation-rate-value'), timeSpeedValue = document.getElementById('time-speed-value');
+    const toolBtns = document.querySelectorAll('.tool-btn');
+    const startScreen = document.getElementById('start-screen');
+
+    // --- SIMULATION STATE & PARAMETERS ---
+    let bumbles = [], foods = [], resources = [], communities = [];
+    let isRunning = false, animationFrameId, day = 0, frameCount = 0;
+    const framesPerDay = 6000; 
+    let timeOfDay = 'Day';
+    let worldStats = { deaths: 0, mutations: 0 };
+    let activeTool = null;
+    let settings = { initialPopulation: 6, foodSpawnInterval: 100, reproductionUrge: 0.5, mutationChance: 0.05, timeMultiplier: 1 };
+
+    // --- UTILITY & NAME FUNCTIONS ---
+    const random = (min, max) => Math.random() * (max - min) + min;
+    const getDistance = (x1, y1, x2, y2) => Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+    const maleNames = ["Liam", "Noah", "Oliver", "Elijah", "James"], femaleNames = ["Olivia", "Emma", "Charlotte", "Amelia", "Ava"], lastNames = ["Smith", "Jones", "Garcia", "Miller", "Davis"];
+    const getRandomFirstName = (gender) => gender === 'male' ? maleNames[Math.floor(random(0, maleNames.length))] : femaleNames[Math.floor(random(0, femaleNames.length))];
+    const getRandomLastName = () => lastNames[Math.floor(random(0, lastNames.length))];
+
+    // --- CLASSES ---
+    class WorldObject { constructor(x, y) { this.x = x; this.y = y; this.id = Math.random().toString(36).substr(2, 9); } }
+    class Food extends WorldObject {
+        constructor(x, y) { super(x, y); this.radius = 4; this.energy = 50; this.pulse = random(0, Math.PI * 2); }
+        draw() { this.pulse += 0.05; const glow = 8 + Math.sin(this.pulse) * 4; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fillStyle = 'rgba(134, 239, 172, 0.9)'; ctx.shadowColor = 'rgba(134, 239, 172, 0.8)'; ctx.shadowBlur = glow; ctx.fill(); ctx.shadowBlur = 0; }
+    }
+    class Wood extends WorldObject {
+        constructor(x, y) { super(x, y); this.width = 15; this.height = 5; }
+        draw() { ctx.fillStyle = '#92400e'; ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height); }
+    }
+    class Fire extends WorldObject {
+        constructor(x, y) { super(x, y); this.radius = 15; this.damage = 0.5; this.particles = []; }
+        update() { if (Math.random() < 0.8) this.particles.push({ x: this.x + random(-8, 8), y: this.y, life: 1, vx: random(-0.2, 0.2), vy: random(-1.5, -0.8), radius: random(2, 5) }); this.particles.forEach(p => { p.life -= 0.04; p.x += p.vx; p.y += p.vy; }); this.particles = this.particles.filter(p => p.life > 0); }
+        draw() { this.particles.forEach(p => { ctx.beginPath(); const a = p.life, r = 255, g = Math.floor(255 * (p.life * 0.5 + 0.5)), b = 0; ctx.fillStyle = `rgba(${r},${g},${b},${a})`; ctx.arc(p.x, p.y, p.radius * p.life, 0, Math.PI * 2); ctx.fill(); }); }
+    }
+    class Structure extends WorldObject {
+        constructor(x, y, type) { super(x, y); this.type = type; this.buildProgress = 0; this.requiredWood = type === 'dwelling' ? 5 : 15; this.isComplete = false; }
+        addWood() { this.buildProgress++; if (this.buildProgress >= this.requiredWood) this.isComplete = true; }
+        draw() {
+            const progressRatio = this.buildProgress / this.requiredWood;
+            ctx.globalAlpha = 0.5 + progressRatio * 0.5;
+            if (this.type === 'dwelling') {
+                const size = 10 + 5 * progressRatio;
+                ctx.fillStyle = '#a16207'; ctx.fillRect(this.x - size / 2, this.y - size / 2, size, size);
+            } else if (this.type === 'monument') {
+                const radius = 8 + 7 * progressRatio;
+                ctx.fillStyle = '#fde047'; ctx.beginPath(); ctx.arc(this.x, this.y, radius, 0, Math.PI * 2); ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+        }
+    }
+    class Community extends WorldObject {
+        constructor(x, y) { super(x, y); this.radius = 30; this.structures = []; this.constructionSite = null; }
+        planStructure() { if (this.constructionSite) return; const angle = random(0, Math.PI * 2); const dist = this.radius + 20; const type = this.structures.length % 5 === 4 ? 'monument' : 'dwelling'; this.constructionSite = new Structure(this.x + Math.cos(angle) * dist, this.y + Math.sin(angle) * dist, type); }
+        buildStructure() { this.structures.push(this.constructionSite); this.constructionSite = null; }
+        draw() { ctx.strokeStyle = '#ca8a04'; ctx.fillStyle = 'rgba(202, 138, 4, 0.1)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.stroke(); ctx.fill(); this.structures.forEach(s => s.draw()); if (this.constructionSite) this.constructionSite.draw(); }
+    }
+
+    class Bumble {
+        constructor(x, y, generation = 1, parentTraits = null) {
+            this.id = Math.random().toString(36).substr(2, 9);
+            this.gender = Math.random() > 0.5 ? 'male' : 'female';
+            this.firstName = getRandomFirstName(this.gender);
+            this.lastName = null;
+            this.x = x || random(20, canvas.width - 20); this.y = y || random(20, canvas.height - 20);
+            this.baseRadius = random(8, 12); this.radius = this.baseRadius;
+            this.generation = generation;
+            this.isZombie = false;
+            this.color = this.gender === 'male' ? '#93c5fd' : '#f9a8d4';
+            
+            if (parentTraits) {
+                this.speed = this.mutate(parentTraits.speed);
+                this.perception = this.mutate(parentTraits.perception);
+                this.lifespan = this.mutate(parentTraits.lifespan, 50);
+                this.intelligence = this.mutate(parentTraits.intelligence, 5);
+                this.lastName = parentTraits.lastName;
+            } else {
+                this.speed = random(0.5, 1.5);
+                this.perception = random(50, 150);
+                this.lifespan = random(40, 80);
+                this.intelligence = random(1, 10);
+            }
+            
+            this.age = 0; this.isDead = false; this.vx = 0; this.vy = 0;
+            this.target = null; this.heldResource = null; this.reproductionCooldown = 0;
+            this.isFounder = false;
+            this.needs = { hunger: 100, energy: 100 };
+            this.state = 'wandering';
+        }
+        
+        get fullName() { return this.lastName ? `${this.firstName} ${this.lastName}` : this.firstName; }
+        
+        mutate(value, range = 1) {
+            if (Math.random() < settings.mutationChance) {
+                worldStats.mutations++;
+                return Math.max(0.1, value + random(-range, range));
+            }
+            return value;
+        }
+
+        updateNeeds() {
+            const baseMetabolism = 0.002;
+            const activityCost = (Math.abs(this.vx) + Math.abs(this.vy)) * 0.001;
+            const nightPenalty = timeOfDay === 'Night' ? 0.001 : 0;
+            this.needs.hunger -= (baseMetabolism + nightPenalty);
+            this.needs.energy -= (baseMetabolism + activityCost);
+            if (this.needs.energy < 0) {
+                 this.needs.hunger += this.needs.energy / 2;
+                 this.needs.energy = 0;
+            }
+            if (timeOfDay !== 'Night' && this.state === 'wandering' && this.needs.energy < 100) {
+                this.needs.energy += 0.01;
+            }
+        }
+
+        updateState() {
+            if (this.isZombie) { this.state = 'hunting'; return; }
+            const founder = bumbles.find(b => b.isFounder);
+            const fleeTarget = this.findClosest(resources.filter(r => r instanceof Fire), this.perception, false);
+            if (fleeTarget) { this.state = 'fleeing'; this.target = fleeTarget; return; }
+            if (this.needs.hunger < 40) { this.state = 'seekingFood'; }
+            else if (this.needs.hunger > 80 && this.reproductionCooldown <= 0 && this.age > 10 && this.age < this.lifespan * 0.8 && Math.random() < settings.reproductionUrge) { this.state = 'seekingMate'; }
+            else if (day > 1 && this.intelligence > 15 && communities.length === 0) {
+                if (!founder && !this.isFounder) { this.state = 'planning'; } 
+                else if (founder && this.id !== founder.id) { this.state = 'assisting'; }
+            }
+            else if (this.intelligence > 15 && !this.heldResource) { this.state = 'gathering'; }
+            else if (this.intelligence > 15 && this.heldResource === 'wood') { this.state = 'building'; }
+            else if (this.state !== 'wandering') { this.state = 'wandering'; }
+        }
+        
+        performAction() {
+            this.target = null;
+            switch (this.state) {
+                case 'hunting':
+                    const prey = bumbles.filter(b => !b.isZombie && !b.isDead);
+                    this.findClosest(prey, this.perception * 2, true);
+                    break;
+                case 'seekingFood':
+                    this.findClosest(foods, this.perception, true);
+                    break;
+                case 'seekingMate':
+                    const potentialMates = bumbles.filter(b => b.id !== this.id && b.gender !== this.gender && !b.isDead && b.reproductionCooldown <= 0 && b.age > 10);
+                    this.findClosest(potentialMates, this.perception, true);
+                    break;
+                case 'gathering':
+                    this.findClosest(resources.filter(r => r instanceof Wood), this.perception * 1.5, true);
+                    break;
+                case 'building':
+                    const constructionSites = communities.map(c => c.constructionSite).filter(Boolean);
+                    if (constructionSites.length > 0) this.findClosest(constructionSites, this.perception * 2, true);
+                    else this.state = 'wandering';
+                    break;
+                case 'planning':
+                    this.isFounder = true; this.vx = 0; this.vy = 0;
+                    break;
+                case 'assisting':
+                    this.target = bumbles.find(b => b.isFounder);
+                    break;
+                case 'fleeing':
+                    break;
+                case 'wandering':
+                default:
+                    if (Math.random() < 0.02) { this.vx = random(-this.speed*0.5, this.speed*0.5); this.vy = random(-this.speed*0.5, this.speed*0.5); }
+                    break;
+            }
+        }
+
+        findClosest(targets, range, setTarget = true) {
+            let closest = null, minDist = range;
+            for (const t of targets) {
+                const d = getDistance(this.x, this.y, t.x, t.y);
+                if (d < minDist) { minDist = d; closest = t; }
+            }
+            if (setTarget) this.target = closest;
+            return closest;
+        }
+
+        update() {
+            if (this.isDead) return;
+            this.age += 1 / framesPerDay;
+            this.updateNeeds();
+            if (this.needs.hunger <= 0 || this.age >= this.lifespan) { this.die(); return; }
+            if (this.reproductionCooldown > 0) this.reproductionCooldown--;
+
+            if (frameCount % 60 === 0) this.updateState();
+            this.performAction();
+
+            const effectiveSpeed = this.isZombie ? this.speed * 0.7 : this.speed * (this.needs.energy / 100);
+            if (this.target) {
+                const angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+                if (this.state === 'fleeing') {
+                    this.vx = -Math.cos(angle) * this.speed;
+                    this.vy = -Math.sin(angle) * this.speed;
+                } else {
+                    this.vx = Math.cos(angle) * effectiveSpeed;
+                    this.vy = Math.sin(angle) * effectiveSpeed;
+                }
+            } else if (this.state !== 'wandering' && this.state !== 'planning') {
+                if (Math.random() < 0.05) { this.vx = random(-this.speed*0.2, this.speed*0.2); this.vy = random(-this.speed*0.2, this.speed*0.2); }
+            }
+            
+            this.x += this.vx; this.y += this.vy;
+            if (this.x < this.radius || this.x > canvas.width - this.radius) this.vx *= -1;
+            if (this.y < this.radius || this.y > canvas.height - this.radius) this.vy *= -1;
+
+            let targetAngle = Math.atan2(this.vy, this.vx);
+            if (Math.abs(this.vx) < 0.1 && Math.abs(this.vy) < 0.1) targetAngle = this.smoothAngle || 0;
+            let angleDiff = targetAngle - (this.smoothAngle || 0);
+            while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+            while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+            this.smoothAngle = (this.smoothAngle || 0) + angleDiff * 0.1;
+        }
+
+        reproduce(partner) {
+            if (this.isZombie || partner.isZombie) return;
+            if (this.needs.hunger > 60 && partner.needs.hunger > 60 && this.reproductionCooldown <= 0 && partner.reproductionCooldown <= 0) {
+                const energyCost = 30;
+                const cooldown = 500;
+                this.needs.hunger -= energyCost; partner.needs.hunger -= energyCost;
+                this.reproductionCooldown = cooldown; partner.reproductionCooldown = cooldown;
+                let familyName = this.lastName || partner.lastName || getRandomLastName();
+                this.lastName = familyName; partner.lastName = familyName;
+                const childTraits = { speed: (this.speed + partner.speed) / 2, perception: (this.perception + partner.perception) / 2, lifespan: (this.lifespan + partner.lifespan) / 2, intelligence: (this.intelligence + partner.intelligence) / 2, lastName: familyName };
+                const childGen = Math.max(this.generation, partner.generation) + 1;
+                bumbles.push(new Bumble(this.x, this.y, childGen, childTraits));
+            }
+        }
+        
+        die() { this.isDead = true; worldStats.deaths++; }
+        
+        draw() {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fillStyle = this.isZombie ? '#4ade80' : this.color;
+            if (this.isFounder) {
+                ctx.strokeStyle = '#fde047';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            }
+            ctx.fill();
+
+            const angle = this.smoothAngle || 0;
+            const eye1X = this.x + Math.cos(angle - 0.6) * this.radius * 0.5, eye1Y = this.y + Math.sin(angle - 0.6) * this.radius * 0.5;
+            const eye2X = this.x + Math.cos(angle + 0.6) * this.radius * 0.5, eye2Y = this.y + Math.sin(angle + 0.6) * this.radius * 0.5;
+            const eyeRadius = this.radius * 0.3;
+            ctx.beginPath(); ctx.arc(eye1X, eye1Y, eyeRadius, 0, Math.PI * 2); ctx.fillStyle = 'white'; ctx.fill();
+            ctx.beginPath(); ctx.arc(eye2X, eye2Y, eyeRadius, 0, Math.PI * 2); ctx.fillStyle = 'white'; ctx.fill();
+            if (!this.isZombie) {
+                const eyeOffsetX = Math.cos(angle) * this.radius * 0.3, eyeOffsetY = Math.sin(angle) * this.radius * 0.3;
+                const pupilRadius = eyeRadius * 0.5;
+                ctx.beginPath(); ctx.arc(eye1X + eyeOffsetX, eye1Y + eyeOffsetY, pupilRadius, 0, Math.PI * 2); ctx.fillStyle = 'black'; ctx.fill();
+                ctx.beginPath(); ctx.arc(eye2X + eyeOffsetX, eye2Y + eyeOffsetY, pupilRadius, 0, Math.PI * 2); ctx.fillStyle = 'black'; ctx.fill();
+            }
+        }
+    }
+
+    // --- SIMULATION CORE LOGIC ---
+    function init() {
+        const container = document.getElementById('simulation-container'); canvas.width = container.clientWidth; canvas.height = container.clientHeight;
+        bumbles = []; foods = []; resources = []; communities = []; day = 0; frameCount = 0; worldStats = { deaths: 0, mutations: 0 };
+        for (let i = 0; i < settings.initialPopulation; i++) bumbles.push(new Bumble());
+        updateDayNightCycle(true);
+    }
+
+    function updateDayNightCycle(force = false) {
+        const dayProgress = (frameCount % framesPerDay) / framesPerDay;
+        let newTimeOfDay = 'Day';
+        if (dayProgress > 0.9) newTimeOfDay = 'Dawn';
+        else if (dayProgress > 0.5) newTimeOfDay = 'Night';
+        else if (dayProgress > 0.4) newTimeOfDay = 'Dusk';
+        
+        if (newTimeOfDay !== timeOfDay || force) {
+            timeOfDay = newTimeOfDay;
+            let bgStyle;
+            switch (timeOfDay) {
+                case 'Day': bgStyle = `radial-gradient(ellipse at bottom, var(--ground-color) 0%, var(--sky-horizon) 100%)`; break;
+                case 'Dusk': bgStyle = `radial-gradient(ellipse at bottom, #1e293b 0%, #4338ca 100%)`; break;
+                case 'Night': bgStyle = `radial-gradient(ellipse at bottom, #0f172a 0%, #020617 100%)`; break;
+                case 'Dawn': bgStyle = `radial-gradient(ellipse at bottom, #1e293b 0%, #f97316 100%)`; break;
+            }
+            simulationContainer.style.background = bgStyle;
+        }
+    }
+    
+    function checkCommunityFormation() {
+        if (communities.length > 0) return;
+        const founder = bumbles.find(b => b.isFounder);
+        if (founder) {
+            const assistants = bumbles.filter(b => b.id !== founder.id && getDistance(b.x, b.y, founder.x, founder.y) < 30);
+            if (assistants.length >= 2) {
+                communities.push(new Community(founder.x, founder.y));
+                founder.isFounder = false;
+                founder.state = 'gathering';
+                assistants.forEach(a => a.state = 'gathering');
+            }
+        }
+    }
+
+    function updateSimulation() {
+        if (frameCount % settings.foodSpawnInterval === 0) foods.push(new Food(random(10, canvas.width - 10), random(10, canvas.height - 10)));
+        if (frameCount % 1000 === 0 && Math.random() < 0.1 * communities.length) { const c = communities[Math.floor(random(0, communities.length))]; if (c) c.planStructure(); }
+        
+        bumbles.forEach(b => b.update());
+        if (frameCount % 10 === 0) checkCommunityFormation();
+
+        for (let i = 0; i < bumbles.length; i++) {
+            const b1 = bumbles[i];
+            if (b1.isDead) continue;
+            for (let j = foods.length - 1; j >= 0; j--) { if (getDistance(b1.x, b1.y, foods[j].x, foods[j].y) < b1.radius) { b1.needs.hunger = Math.min(100, b1.needs.hunger + foods[j].energy); foods.splice(j, 1); b1.target = null; } }
+            for (let j = resources.length - 1; j >= 0; j--) { const r = resources[j]; if (r instanceof Wood && getDistance(b1.x, b1.y, r.x, r.y) < b1.radius && !b1.heldResource) { b1.heldResource = 'wood'; resources.splice(j, 1); b1.target = null; } }
+            for (const r of resources) { if (r instanceof Fire && getDistance(b1.x, b1.y, r.x, r.y) < b1.radius + r.radius) { b1.needs.hunger -= r.damage; } }
+            communities.forEach(c => { if (c.constructionSite && getDistance(b1.x, b1.y, c.constructionSite.x, c.constructionSite.y) < b1.radius && b1.heldResource) { b1.heldResource = null; c.constructionSite.addWood(); b1.intelligence += 0.2; if (c.constructionSite.isComplete) c.buildStructure(); b1.target = null; } });
+            
+            for (let j = i + 1; j < bumbles.length; j++) {
+                const b2 = bumbles[j];
+                if (b2.isDead) continue;
+                if (getDistance(b1.x, b1.y, b2.x, b2.y) < b1.radius + b2.radius) {
+                    if (b1.isZombie && !b2.isZombie) b2.isZombie = true;
+                    if (b2.isZombie && !b1.isZombie) b1.isZombie = true;
+                    if (!b1.isZombie && !b2.isZombie && b1.gender !== b2.gender) b1.reproduce(b2);
+                }
+            }
+        }
+        
+        bumbles = bumbles.filter(b => !b.isDead);
+        frameCount++; day = frameCount / framesPerDay;
+        if (frameCount % 60 === 0) updateDayNightCycle(false);
+    }
+    
+    function drawSimulation() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        foods.forEach(f => f.draw());
+        resources.forEach(r => { if (r.update) r.update(); r.draw(); });
+        communities.forEach(c => c.draw());
+        bumbles.forEach(b => b.draw());
+    }
+
+    function animate() {
+        if (!isRunning) return;
+        for (let i = 0; i < settings.timeMultiplier; i++) { updateSimulation(); }
+        drawSimulation();
+        if (frameCount % 30 === 0) updateUI();
+        animationFrameId = requestAnimationFrame(animate);
+    }
+
+    function updateUI() {
+        populationStat.textContent = bumbles.length;
+        dayStat.textContent = Math.floor(day);
+        timeOfDayStat.textContent = timeOfDay;
+        citiesStat.textContent = communities.length;
+        const familyNames = new Set(bumbles.filter(b => b.lastName).map(b => b.lastName));
+        familiesStat.textContent = familyNames.size;
+        deathsStat.textContent = worldStats.deaths;
+        mutationsStat.textContent = worldStats.mutations;
+        maxGenStat.textContent = bumbles.reduce((max, b) => Math.max(max, b.generation), 0);
+        avgIntelStat.textContent = bumbles.length > 0 ? (bumbles.reduce((acc, b) => acc + b.intelligence, 0) / bumbles.length).toFixed(1) : '0';
+    }
+
+    function makeDraggable(panel) {
+        const handle = panel.querySelector('.drag-handle') || panel;
+        let isDragging = false;
+        let offsetX, offsetY;
+        handle.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            offsetX = e.clientX - panel.getBoundingClientRect().left;
+            offsetY = e.clientY - panel.getBoundingClientRect().top;
+            handle.style.cursor = 'grabbing';
+            panel.style.transition = 'none';
+        });
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            let newX = e.clientX - offsetX;
+            let newY = e.clientY - offsetY;
+            const containerRect = document.getElementById('simulation-container').getBoundingClientRect();
+            newX = Math.max(0, Math.min(newX, containerRect.width - panel.offsetWidth));
+            newY = Math.max(0, Math.min(newY, containerRect.height - panel.offsetHeight));
+            panel.style.left = `${newX}px`;
+            panel.style.top = `${newY}px`;
+            panel.style.transform = '';
+        });
+        window.addEventListener('mouseup', () => {
+            isDragging = false;
+            handle.style.cursor = 'grab';
+            panel.style.transition = '';
+        });
+    }
+    makeDraggable(document.getElementById('stats-panel'));
+    makeDraggable(document.getElementById('tool-panel'));
+    
+    // --- EVENT LISTENERS ---
+    function togglePlayPause() {
+        isRunning = !isRunning;
+        playIcon.classList.toggle('hidden');
+        pauseIcon.classList.toggle('hidden');
+        playPauseBtn.classList.toggle('paused');
+        if (isRunning) {
+            animate();
+        } else {
+            cancelAnimationFrame(animationFrameId);
+        }
+    }
+
+    function showBumbleInfo(bumble) {
+        bumbleName.textContent = bumble.fullName;
+        bumbleGeneration.textContent = bumble.generation;
+        bumbleGender.textContent = bumble.gender.charAt(0).toUpperCase() + bumble.gender.slice(1);
+        bumbleGender.style.color = bumble.gender === 'male' ? '#93c5fd' : '#f9a8d4';
+        bumbleAge.textContent = `${bumble.age.toFixed(1)} / ${bumble.lifespan.toFixed(1)} days`; 
+        bumbleEnergyBar.style.width = `${bumble.needs.hunger}%`;
+        bumbleOccupation.textContent = bumble.state.charAt(0).toUpperCase() + bumble.state.slice(1);
+        bumbleHolding.textContent = bumble.heldResource || 'Nothing';
+        bumbleInfoModal.classList.add('visible');
+    }
+
+    startScreen.addEventListener('click', () => {
+        startScreen.style.opacity = '0';
+        setTimeout(() => startScreen.style.display = 'none', 500);
+        togglePlayPause();
+    }, { once: true });
+
+    playPauseBtn.addEventListener('click', togglePlayPause);
+    restartBtn.addEventListener('click', () => { if(isRunning) togglePlayPause(); init(); updateUI(); drawSimulation(); });
+    settingsBtn.addEventListener('click', () => settingsModal.classList.add('visible'));
+    closeSettingsBtn.addEventListener('click', () => settingsModal.classList.remove('visible'));
+    
+    zombieBtn.addEventListener('click', () => {
+        if (!isRunning) return;
+        const newZombie = new Bumble(random(20, canvas.width - 20), random(20, canvas.height - 20));
+        newZombie.isZombie = true;
+        bumbles.push(newZombie);
+    });
+
+    expandStatsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isExpanded = statsDetailsWrapper.classList.toggle('grid-rows-[1fr]');
+        expandStatsBtn.querySelector('svg').style.transform = isExpanded ? 'rotate(180deg)' : 'rotate(0deg)';
+    });
+    
+    initialPopSlider.addEventListener('input', (e) => { settings.initialPopulation = parseInt(e.target.value); initialPopValue.textContent = e.target.value; });
+    foodIntervalSlider.addEventListener('input', (e) => { settings.foodSpawnInterval = parseInt(e.target.value); foodIntervalValue.textContent = e.target.value; });
+    reproductionRateSlider.addEventListener('input', (e) => { settings.reproductionUrge = parseInt(e.target.value) / 100; reproductionRateValue.textContent = `${e.target.value}%`; });
+    mutationRateSlider.addEventListener('input', (e) => { settings.mutationChance = parseInt(e.target.value) / 100; mutationRateValue.textContent = `${e.target.value}%`; });
+    timeSpeedSlider.addEventListener('input', (e) => { settings.timeMultiplier = parseInt(e.target.value); timeSpeedValue.textContent = `${e.target.value}x`; });
+    
+    toolBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tool = btn.dataset.tool;
+            if (activeTool === tool) { activeTool = null; btn.classList.remove('active'); canvas.style.cursor = 'default'; }
+            else { activeTool = tool; toolBtns.forEach(b => b.classList.remove('active')); btn.classList.add('active'); canvas.style.cursor = 'copy'; }
+        });
+    });
+
+    canvas.addEventListener('click', (event) => {
+        const rect = canvas.getBoundingClientRect(); const x = event.clientX - rect.left, y = event.clientY - rect.top;
+        if (activeTool) { if (activeTool === 'food') foods.push(new Food(x, y)); if (activeTool === 'wood') resources.push(new Wood(x, y)); if (activeTool === 'fire') resources.push(new Fire(x, y)); return; }
+        let clickedBumble = null; for (const bumble of bumbles) { if (getDistance(x, y, bumble.x, bumble.y) < bumble.radius) { clickedBumble = bumble; break; } }
+        if (clickedBumble) showBumbleInfo(clickedBumble);
+    });
+
+    closeInfoBtn.addEventListener('click', () => bumbleInfoModal.classList.remove('visible'));
+    [bumbleInfoModal, settingsModal].forEach(modal => { modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('visible'); }); });
+
+    window.addEventListener('resize', () => {
+        const wasRunning = isRunning;
+        if (wasRunning) { isRunning = false; cancelAnimationFrame(animationFrameId); }
+        init();
+        if (wasRunning) {
+            isRunning = true;
+            playPauseBtn.classList.remove('paused');
+            playIcon.classList.add('hidden');
+            pauseIcon.classList.remove('hidden');
+            animate();
+        } else {
+             playPauseBtn.classList.add('paused');
+             playIcon.classList.remove('hidden');
+             pauseIcon.classList.add('hidden');
+             drawSimulation();
+             updateUI();
+        }
+    });
+
+    // Initial Setup
+    init();
+    drawSimulation();
+    updateUI();
+});
+</script>
+</body>
+</html>
