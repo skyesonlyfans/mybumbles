@@ -2,16 +2,20 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Bumbles: A Life Simulation</title>
-    <meta name="description" content="A dynamic life simulation game where you observe and guide a colony of Bumbles as they evolve, build cities, and face challenges like war and faith.">
-    <meta name="keywords" content="simulation, life simulation, evolution, game, javascript game, bumbles, ai, procedural generation">
+    <meta name="description" content="A dynamic life simulation game where you observe and guide a colony of Bumbles as they evolve, build cities, and wage war.">
+    <meta name="keywords" content="simulation, life simulation, evolution, game, javascript game, bumbles, ai, procedural generation, war">
+    <!-- Favicon using SVG for a modern look -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐝</text></svg>">
     
+    <!-- Tailwind CSS for rapid UI development -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for better typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Material Icons for UI elements -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons|Material+Icons+Outlined" rel="stylesheet">
     
     <style>
@@ -20,6 +24,7 @@
             --sky-horizon: #38bdf8;
             --ground-color: #1e293b;
         }
+        /* Basic setup for a full-screen experience */
         html, body {
             height: 100%;
             width: 100%;
@@ -32,13 +37,14 @@
             font-family: 'Inter', sans-serif;
             background-color: #020617;
             color: #e2e8f0;
-            overscroll-behavior: none;
+            overscroll-behavior: none; /* Prevents pull-to-refresh on mobile */
         }
         #simulation-container {
             width: 100dvw;
             height: 100dvh;
             transition: background 2s ease-in-out;
         }
+        /* A modern glassmorphism effect for UI panels */
         .glassmorphism {
             background: rgba(30, 41, 59, 0.5);
             backdrop-filter: blur(16px);
@@ -46,6 +52,7 @@
             border: 1px solid rgba(71, 85, 105, 0.5);
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         }
+        /* Styling for the main control buttons */
         .control-btn {
             transition: all 0.3s ease;
             border: 1px solid transparent;
@@ -63,11 +70,13 @@
              transform: translateY(1px) scale(0.98);
              box-shadow: inset 0 3px 7px rgba(0,0,0,0.4), 0 0 10px rgba(59, 130, 246, 0.6);
         }
+        /* Pulsing animation for the play button when paused */
         #play-pause-btn.paused { animation: pulse 2s infinite; }
         @keyframes pulse {
             0%, 100% { transform: scale(1); box-shadow: 0 0 8px rgba(59, 130, 246, 0.3), 0 0 15px rgba(59, 130, 246, 0.2); }
             50% { transform: scale(1.05); box-shadow: 0 0 20px rgba(59, 130, 246, 0.6), 0 0 40px rgba(59, 130, 246, 0.4); }
         }
+        /* Modal animations */
         .modal-enter { animation: fadeInScale 0.4s cubic-bezier(0.165, 0.840, 0.440, 1.000) forwards; }
         @keyframes fadeInScale {
             from { opacity: 0; transform: scale(0.92); }
@@ -82,6 +91,7 @@
             opacity: 1;
             visibility: visible;
         }
+        /* Canvas styling and interaction cursors */
         canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
         canvas:active { cursor: grabbing; }
         .draggable {
@@ -99,6 +109,7 @@
         #start-screen {
             transition: opacity 0.5s ease-out, visibility 0.5s;
         }
+        /* Styles for the collapsible statistics panel */
         #stats-panel-content {
             transition: all 0.5s ease-in-out, grid-template-rows 0.5s step-end;
             overflow: hidden;
@@ -110,10 +121,6 @@
             transition: all 0.5s ease-in-out, grid-template-rows 0.5s step-start;
             padding-top: 0;
             padding-bottom: 0;
-        }
-        #family-list-stat {
-            max-height: 60px;
-            overflow-y: auto;
         }
     </style>
 </head>
@@ -127,7 +134,7 @@
             <div class="drag-handle rounded-t-lg text-center text-slate-300 font-bold flex justify-between items-center pr-2">
                 <span class="flex-grow text-center">Statistics</span>
                  <button id="collapse-stats-btn" class="p-1 rounded-full hover:bg-slate-600/50">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-300 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    <svg id="collapse-icon" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-300 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                 </button>
             </div>
             <div id="stats-panel-content" class="p-3">
@@ -135,13 +142,13 @@
                     <div class="grid grid-cols-2 gap-x-4 gap-y-1">
                         <p>Population:</p><p class="text-right"><span id="population-stat" class="font-semibold text-white">0</span></p>
                         <p>Day:</p><p class="text-right"><span id="day-stat" class="font-semibold text-white">0</span> (<span id="time-of-day-stat">Day</span>)</p>
-                        <p>Provinces:</p><p class="text-right"><span id="provinces-stat" class="font-semibold text-white">0</span></p>
+                        <p>Provinces:</p><p class="text-right"><span id="provinces-stat" class="font-semibold text-white">0</span> / 4</p>
                         <p>Cities:</p><p class="text-right"><span id="cities-stat" class="font-semibold text-white">0</span></p>
-                        <p>Doctors:</p><p class="text-right"><span id="doctors-stat" class="font-semibold text-white">0</span></p>
+                        <p>Scientists:</p><p class="text-right"><span id="scientists-stat" class="font-semibold text-white">0</span></p>
+                        <p>Workers:</p><p class="text-right"><span id="workers-stat" class="font-semibold text-white">0</span></p>
+                        <p>Soldiers:</p><p class="text-right"><span id="soldiers-stat" class="font-semibold text-white">0</span></p>
+                        <p>Infected:</p><p class="text-right"><span id="infected-stat" class="font-semibold text-red-400">0</span></p>
                     </div>
-                    <div class="border-t border-slate-600 my-2"></div>
-                    <p>Families (<span id="families-count-stat">0</span>):</p>
-                    <div id="family-list-stat" class="text-right text-slate-300 text-xs italic pr-1">None</div>
                 </div>
             </div>
         </div>
@@ -178,25 +185,40 @@
             <div class="grid grid-cols-2 gap-4 text-left">
                 <div class="bg-slate-900/50 p-3 rounded-lg"><p class="text-xs text-slate-400">Province</p><p id="bumble-province" class="font-semibold"></p></div>
                 <div class="bg-slate-900/50 p-3 rounded-lg"><p class="text-xs text-slate-400">Home City</p><p id="bumble-city" class="font-semibold"></p></div>
-                <div class="bg-slate-900/50 p-3 rounded-lg"><p class="text-xs text-slate-400">Lifespan Limit</p><p id="bumble-lifespan" class="font-semibold text-lg"></p></div>
-                <div class="bg-slate-900/50 p-3 rounded-lg"><p class="text-xs text-slate-400">Fertility</p><p id="bumble-fertility" class="font-semibold text-lg"></p></div>
+                <div class="bg-slate-900/50 p-3 rounded-lg"><p class="text-xs text-slate-400">Job</p><p id="bumble-job" class="font-semibold"></p></div>
+                <div class="bg-slate-900/50 p-3 rounded-lg"><p class="text-xs text-slate-400">Ambition</p><p id="bumble-ambition" class="font-semibold text-lg"></p></div>
                 <div class="bg-slate-900/50 p-3 rounded-lg col-span-2"><p class="text-xs text-slate-400">Health</p><div class="w-full bg-slate-700 rounded-full h-2.5 mt-1"><div id="bumble-health-bar" class="bg-green-500 h-2.5 rounded-full"></div></div></div>
-                <div class="bg-slate-900/50 p-3 rounded-lg col-span-2"><p class="text-xs text-slate-400">Current State</p><p id="bumble-occupation" class="font-semibold"></p></div>
+                <div class="bg-slate-900/50 p-3 rounded-lg col-span-2"><p class="text-xs text-slate-400">Current State</p><p id="bumble-state" class="font-semibold"></p></div>
             </div>
             <button id="close-info-btn" class="mt-6 w-full bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-500 hover:to-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300">Close</button>
         </div>
     </div>
+
+    <div id="city-info-modal" class="modal-wrapper absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center z-20 p-4">
+        <div class="glassmorphism rounded-2xl w-full max-w-sm p-6 text-center modal-enter">
+            <h2 id="city-name" class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-amber-300 to-orange-500 mb-1"></h2>
+            <p class="text-slate-400 mb-4">Province of <span id="city-province"></span></p>
+            <div class="grid grid-cols-2 gap-4 text-left">
+                <div class="bg-slate-900/50 p-3 rounded-lg col-span-2"><p class="text-xs text-slate-400">Population</p><p id="city-population" class="font-semibold text-lg"></p></div>
+                <div class="bg-slate-900/50 p-3 rounded-lg"><p class="text-xs text-slate-400">Food Stockpile</p><p id="city-food" class="font-semibold text-lg"></p></div>
+                <div class="bg-slate-900/50 p-3 rounded-lg"><p class="text-xs text-slate-400">Wood Stockpile</p><p id="city-wood" class="font-semibold text-lg"></p></div>
+            </div>
+            <button id="close-city-info-btn" class="mt-6 w-full bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-500 hover:to-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300">Close</button>
+        </div>
+    </div>
+
     <div id="settings-modal" class="modal-wrapper absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center z-20 p-4">
         <div class="glassmorphism rounded-2xl w-full max-w-sm p-6 modal-enter">
             <h2 class="text-2xl font-bold text-white mb-4">Simulation Settings</h2>
             <div class="space-y-4">
-                <div><label for="initial-pop-slider" class="block mb-1 text-sm font-medium text-slate-300">Initial Population: <span id="initial-pop-value">10</span></label><input id="initial-pop-slider" type="range" min="2" max="100" value="10" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"></div>
-                <div><label for="food-interval-slider" class="block mb-1 text-sm font-medium text-slate-300">Food Spawn Rate: <span id="food-interval-value">80</span></label><input id="food-interval-slider" type="range" min="10" max="500" value="80" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"></div>
-                <div><label for="reproduction-rate-slider" class="block mb-1 text-sm font-medium text-slate-300">Reproduction Urge: <span id="reproduction-rate-value">60</span>%</label><input id="reproduction-rate-slider" type="range" min="0" max="100" value="60" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"></div>
+                <div><label for="initial-pop-slider" class="block mb-1 text-sm font-medium text-slate-300">Initial Population: <span id="initial-pop-value">12</span></label><input id="initial-pop-slider" type="range" min="2" max="100" value="12" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"></div>
+                <div><label for="tree-density-slider" class="block mb-1 text-sm font-medium text-slate-300">Tree Density: <span id="tree-density-value">20</span></label><input id="tree-density-slider" type="range" min="5" max="50" value="20" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"></div>
+                <div><label for="food-interval-slider" class="block mb-1 text-sm font-medium text-slate-300">Food Spawn Rate: <span id="food-interval-value">50</span></label><input id="food-interval-slider" type="range" min="10" max="500" value="50" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"></div>
+                <div><label for="reproduction-rate-slider" class="block mb-1 text-sm font-medium text-slate-300">Reproduction Urge: <span id="reproduction-rate-value">80</span>%</label><input id="reproduction-rate-slider" type="range" min="0" max="100" value="80" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"></div>
                 <div><label for="mutation-rate-slider" class="block mb-1 text-sm font-medium text-slate-300">Mutation Chance: <span id="mutation-rate-value">15</span>%</label><input id="mutation-rate-slider" type="range" min="0" max="50" value="15" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"></div>
                 <div><label for="time-speed-slider" class="block mb-1 text-sm font-medium text-slate-300">Time Speed: <span id="time-speed-value">1</span>x</label><input id="time-speed-slider" type="range" min="1" max="10" value="1" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"></div>
             </div>
-            <p class="text-xs text-slate-400 mt-4">Population/Rate changes apply on restart.</p>
+            <p class="text-xs text-slate-400 mt-4">Population, Density & Rate changes apply on restart.</p>
             <button id="close-settings-btn" class="mt-4 w-full bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-500 hover:to-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300">Close</button>
         </div>
     </div>
@@ -206,6 +228,7 @@
         <div class="text-center p-4">
             <h1 class="text-4xl md:text-5xl font-bold text-amber-300 animate-pulse">Bumbles</h1>
             <p class="text-slate-300 mt-2 text-lg">A Life Simulation</p>
+            <p class="text-slate-400 mt-4 text-sm">by skye &lt;3</p>
             <p class="text-slate-400 mt-8 text-xl">(Tap or Click to Begin)</p>
         </div>
     </div>
@@ -217,35 +240,63 @@ document.addEventListener('DOMContentLoaded', () => {
     const simulationContainer = document.getElementById('simulation-container');
     const playPauseBtn = document.getElementById('play-pause-btn'), playIcon = document.getElementById('play-icon'), pauseIcon = document.getElementById('pause-icon');
     const restartBtn = document.getElementById('restart-btn'), settingsBtn = document.getElementById('settings-btn'), zombieBtn = document.getElementById('zombie-btn');
-    const populationStat = document.getElementById('population-stat'), dayStat = document.getElementById('day-stat'), timeOfDayStat = document.getElementById('time-of-day-stat'), provincesStat = document.getElementById('provinces-stat'), citiesStat = document.getElementById('cities-stat'), doctorsStat = document.getElementById('doctors-stat'), familiesCountStat = document.getElementById('families-count-stat'), familyListStat = document.getElementById('family-list-stat');
-    const statsPanel = document.getElementById('stats-panel'), collapseStatsBtn = document.getElementById('collapse-stats-btn');
-    const bumbleInfoModal = document.getElementById('bumble-info-modal'), closeInfoBtn = document.getElementById('close-info-btn'), bumbleName = document.getElementById('bumble-name'), bumbleGeneration = document.getElementById('bumble-generation'), bumbleGender = document.getElementById('bumble-gender'), bumbleLifespan = document.getElementById('bumble-lifespan'), bumbleHealthBar = document.getElementById('bumble-health-bar'), bumbleOccupation = document.getElementById('bumble-occupation'), bumbleCity = document.getElementById('bumble-city'), bumbleProvince = document.getElementById('bumble-province'), bumbleFertility = document.getElementById('bumble-fertility');
-    const settingsModal = document.getElementById('settings-modal'), closeSettingsBtn = document.getElementById('close-settings-btn'), initialPopSlider = document.getElementById('initial-pop-slider'), foodIntervalSlider = document.getElementById('food-interval-slider'), reproductionRateSlider = document.getElementById('reproduction-rate-slider'), mutationRateSlider = document.getElementById('mutation-rate-slider'), timeSpeedSlider = document.getElementById('time-speed-slider'), initialPopValue = document.getElementById('initial-pop-value'), foodIntervalValue = document.getElementById('food-interval-value'), reproductionRateValue = document.getElementById('reproduction-rate-value'), mutationRateValue = document.getElementById('mutation-rate-value'), timeSpeedValue = document.getElementById('time-speed-value');
+    const populationStat = document.getElementById('population-stat'), dayStat = document.getElementById('day-stat'), timeOfDayStat = document.getElementById('time-of-day-stat'), provincesStat = document.getElementById('provinces-stat'), citiesStat = document.getElementById('cities-stat'), scientistsStat = document.getElementById('scientists-stat'), workersStat = document.getElementById('workers-stat'), soldiersStat = document.getElementById('soldiers-stat'), infectedStat = document.getElementById('infected-stat');
+    const statsPanel = document.getElementById('stats-panel'), collapseStatsBtn = document.getElementById('collapse-stats-btn'), collapseIcon = document.getElementById('collapse-icon');
+    const bumbleInfoModal = document.getElementById('bumble-info-modal'), closeInfoBtn = document.getElementById('close-info-btn'), bumbleName = document.getElementById('bumble-name'), bumbleGeneration = document.getElementById('bumble-generation'), bumbleHealthBar = document.getElementById('bumble-health-bar'), bumbleState = document.getElementById('bumble-state'), bumbleCity = document.getElementById('bumble-city'), bumbleProvince = document.getElementById('bumble-province'), bumbleJob = document.getElementById('bumble-job'), bumbleAmbition = document.getElementById('bumble-ambition');
+    const cityInfoModal = document.getElementById('city-info-modal'), closeCityInfoBtn = document.getElementById('close-city-info-btn'), cityName = document.getElementById('city-name'), cityProvince = document.getElementById('city-province'), cityPopulation = document.getElementById('city-population'), cityFood = document.getElementById('city-food'), cityWood = document.getElementById('city-wood');
+    const settingsModal = document.getElementById('settings-modal'), closeSettingsBtn = document.getElementById('close-settings-btn');
+    const initialPopSlider = document.getElementById('initial-pop-slider'), foodIntervalSlider = document.getElementById('food-interval-slider'), reproductionRateSlider = document.getElementById('reproduction-rate-slider'), mutationRateSlider = document.getElementById('mutation-rate-slider'), timeSpeedSlider = document.getElementById('time-speed-slider'), treeDensitySlider = document.getElementById('tree-density-slider');
+    const initialPopValue = document.getElementById('initial-pop-value'), foodIntervalValue = document.getElementById('food-interval-value'), reproductionRateValue = document.getElementById('reproduction-rate-value'), mutationRateValue = document.getElementById('mutation-rate-value'), timeSpeedValue = document.getElementById('time-speed-value'), treeDensityValue = document.getElementById('tree-density-value');
     const toolBtns = document.querySelectorAll('.tool-btn');
     const startScreen = document.getElementById('start-screen');
 
     // --- SIMULATION & VIEW STATE ---
-    const world = { width: 5000, height: 5000 };
-    let resourcePatches = [];
+    const world = { width: 6000, height: 6000 };
     let bumbles = [], foods = [], resources = [], cities = [], provinces = [];
     let isRunning = false, animationFrameId, day = 0, frameCount = 0;
-    const framesPerDay = 6000; 
+    const framesPerDay = 3000;
+    const GLOBAL_POP_CAP = 1350;
+    const CITY_POP_CAP = 30;
     let timeOfDay = 'Day';
-    let worldStats = { deaths: 0, mutations: 0, wars: 0 };
     let activeTool = null;
-    let settings = { initialPopulation: 10, foodSpawnInterval: 80, reproductionUrge: 0.6, mutationChance: 0.15, timeMultiplier: 1 };
-    
+    let settings = { initialPopulation: 12, foodSpawnInterval: 50, reproductionUrge: 0.8, mutationChance: 0.15, timeMultiplier: 1, treeClusterDensity: 20 };
     let camera = { x: 0, y: 0, scale: 1, isPanning: false, lastPanX: 0, lastPanY: 0, lastTouchDist: 0 };
+    let nameCounts = {};
+    let projectiles = [];
 
     // --- UTILITY & NAME FUNCTIONS ---
     const random = (min, max) => Math.random() * (max - min) + min;
     const getDistance = (x1, y1, x2, y2) => Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-    const maleNames = ["Liam", "Noah", "Oliver", "Elijah", "James"], femaleNames = ["Olivia", "Emma", "Charlotte", "Amelia", "Ava"], lastNames = ["Smith", "Jones", "Garcia", "Miller", "Davis"];
-    const cityPrefixes = ["Green", "Stone", "River", "Sun", "Moon"], citySuffixes = ["wood", "field", "dale", "crest", "ford"];
-    const provinceColors = ['#e11d48', '#2563eb', '#16a34a', '#ca8a04', '#7c3aed'];
+    const maleNames = ["Liam", "Noah", "Oliver", "Elijah", "James", "William", "Henry", "Lucas", "Benjamin", "Theodore", "Mateo", "Levi", "Sebastian", "Daniel", "Jack", "Michael", "Alexander", "Owen", "Asher", "Samuel"];
+    const femaleNames = ["Olivia", "Emma", "Charlotte", "Amelia", "Ava", "Sophia", "Isabella", "Mia", "Evelyn", "Luna", "Harper", "Camila", "Sofia", "Scarlett", "Elizabeth", "Eleanor", "Emily", "Chloe", "Mila", "Violet"];
+    const lastNames = ["Smith", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez", "Hernandez", "Lopez", "Gonzalez", "Wilson", "Anderson", "Thomas", "Taylor", "Moore", "Jackson", "Martin", "Lee", "Perez", "Thompson", "White", "Harris", "Sanchez", "Clark", "Ramirez", "Lewis", "Robinson", "Walker", "Young", "Allen"];
+    const cityPrefixes = ["Green", "Stone", "River", "Sun", "Moon", "Star", "Iron", "Gold", "Silver", "Clear"], citySuffixes = ["wood", "field", "dale", "crest", "ford", "watch", "haven", "brook", "fall", "gate"];
+    const provinceColors = ['#e11d48', '#2563eb', '#16a34a', '#ca8a04', '#7c3aed', '#db2777', '#f59e0b', '#0891b2', '#65a30d'];
     const getRandomFirstName = (gender) => gender === 'male' ? maleNames[Math.floor(random(0, maleNames.length))] : femaleNames[Math.floor(random(0, femaleNames.length))];
     const getRandomLastName = () => lastNames[Math.floor(random(0, lastNames.length))];
     const generateCityName = () => `${cityPrefixes[Math.floor(random(0, cityPrefixes.length))]} ${citySuffixes[Math.floor(random(0, citySuffixes.length))]}`;
+    
+    function toRoman(num) {
+        if (num < 1 || num > 3999) return num.toString();
+        const val = [1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1];
+        const syb = ["M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I"];
+        let roman = "";
+        for (let i = 0; i < val.length; i++) { while (num >= val[i]) { roman += syb[i]; num -= val[i]; } }
+        return roman;
+    }
+
+    function generateUniqueBumbleName(firstName, lastName) {
+        const baseName = `${firstName} ${lastName}`;
+        if (!nameCounts[baseName]) {
+            nameCounts[baseName] = 1;
+            return baseName;
+        } else {
+            nameCounts[baseName]++;
+            const count = nameCounts[baseName];
+            if (count === 2) return `${baseName} Jr.`;
+            return `${baseName} ${toRoman(count)}`;
+        }
+    }
 
     // --- CLASSES ---
     class WorldObject { constructor(x, y) { this.x = x; this.y = y; this.id = Math.random().toString(36).substr(2, 9); } }
@@ -259,119 +310,31 @@ document.addEventListener('DOMContentLoaded', () => {
         draw() { this.particles.forEach(p => { ctx.beginPath(); const a = p.life, r = 255, g = Math.floor(255 * (p.life * 0.5 + 0.5)), b = 0; ctx.fillStyle = `rgba(${r},${g},${b},${a})`; ctx.arc(p.x, p.y, p.radius * p.life, 0, Math.PI * 2); ctx.fill(); }); }
     }
     class Tree extends WorldObject {
-        constructor(x, y) {
-            super(x, y);
-            this.radius = random(8, 12);
-            this.woodAmount = 3;
-        }
-        draw() {
-            ctx.fillStyle = '#8B4513';
-            ctx.fillRect(this.x - this.radius * 0.2, this.y, this.radius * 0.4, this.radius);
-            ctx.fillStyle = '#228B22';
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-            ctx.fill();
-        }
+        constructor(x, y) { super(x, y); this.radius = random(8, 12); this.woodAmount = 3; this.foodSpawnTimer = random(500, 1500); }
+        update() { this.foodSpawnTimer--; if (this.foodSpawnTimer <= 0) { const angle = random(0, Math.PI * 2); const dist = this.radius + random(5, 15); foods.push(new Food(this.x + Math.cos(angle) * dist, this.y + Math.sin(angle) * dist)); this.foodSpawnTimer = random(1000, 2500); } }
+        draw() { ctx.fillStyle = '#8B4513'; ctx.fillRect(this.x - this.radius * 0.2, this.y, this.radius * 0.4, this.radius); ctx.fillStyle = '#228B22'; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill(); }
     }
     class Structure extends WorldObject {
-        constructor(x, y, type) { 
-            super(x, y); 
-            this.type = type; 
-            this.buildProgress = 0; 
-            this.requiredWood = { 'dwelling': 5, 'monument': 15, 'church': 10 }[type];
-            this.isComplete = false; 
-            this.isPraying = false;
-        }
+        constructor(x, y, type) { super(x, y); this.type = type; this.buildProgress = 0; this.requiredWood = { 'dwelling': 5, 'monument': 15, 'church': 10 }[type]; this.isComplete = false; }
         addWood() { this.buildProgress++; if (this.buildProgress >= this.requiredWood) this.isComplete = true; }
-        draw() {
-            const progressRatio = this.buildProgress / this.requiredWood;
-            ctx.globalAlpha = 0.5 + progressRatio * 0.5;
-            if (this.type === 'dwelling') {
-                const size = 10 + 5 * progressRatio;
-                ctx.fillStyle = '#a16207'; ctx.fillRect(this.x - size / 2, this.y - size / 2, size, size);
-            } else if (this.type === 'monument') {
-                const radius = 8 + 7 * progressRatio;
-                ctx.fillStyle = '#fde047'; ctx.beginPath(); ctx.arc(this.x, this.y, radius, 0, Math.PI * 2); ctx.fill();
-            } else if (this.type === 'church') {
-                const width = 12 + 8 * progressRatio;
-                const height = 15 + 10 * progressRatio;
-                ctx.fillStyle = '#e2e8f0';
-                ctx.fillRect(this.x - width/2, this.y - height/2, width, height);
-                ctx.fillStyle = '#ef4444';
-                ctx.fillRect(this.x - 2, this.y - height/2 - 5, 4, 10);
-                ctx.fillRect(this.x - 5, this.y - height/2, 10, 4);
-            }
-            ctx.globalAlpha = 1;
-
-            if (this.isPraying) {
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-                ctx.font = '12px Inter';
-                ctx.textAlign = 'center';
-                ctx.fillText('Bumble prayers...', this.x, this.y - 30);
-            }
-        }
+        draw() { const progressRatio = this.buildProgress / this.requiredWood; ctx.globalAlpha = 0.5 + progressRatio * 0.5; if (this.type === 'dwelling') { const size = 10 + 5 * progressRatio; ctx.fillStyle = '#a16207'; ctx.fillRect(this.x - size / 2, this.y - size / 2, size, size); } else if (this.type === 'monument') { const radius = 8 + 7 * progressRatio; ctx.fillStyle = '#fde047'; ctx.beginPath(); ctx.arc(this.x, this.y, radius, 0, Math.PI * 2); ctx.fill(); } else if (this.type === 'church') { const width = 12 + 6 * progressRatio; const height = 18 + 9 * progressRatio; ctx.fillStyle = '#e2e8f0'; ctx.fillRect(this.x - width / 2, this.y - height / 2, width, height); ctx.fillStyle = '#64748b'; ctx.beginPath(); ctx.moveTo(this.x, this.y - height); ctx.lineTo(this.x - width / 2, this.y - height / 2); ctx.lineTo(this.x + width / 2, this.y - height / 2); ctx.closePath(); ctx.fill(); } ctx.globalAlpha = 1; }
     }
     class City extends WorldObject {
-        constructor(x, y, provinceId) {
-            super(x, y);
-            this.name = generateCityName();
-            this.provinceId = provinceId;
-            this.radius = 30;
-            this.territoryRadius = 150;
-            this.structures = [];
-            this.constructionSite = null;
-            this.woodStockpile = 0;
-            this.foodStockpile = 0;
-            this.health = 1000;
-        }
-        planStructure() { 
-            if (this.constructionSite) return; 
-            const angle = random(0, Math.PI * 2); 
-            const dist = this.radius + random(20, 40); 
-            let type = 'dwelling';
-            const cityBumbles = bumbles.filter(b => b.cityId === this.id);
-            const avgIntelligence = cityBumbles.length > 0 ? cityBumbles.reduce((acc, b) => acc + b.intelligence, 0) / cityBumbles.length : 0;
-            if (this.structures.length > 3 && !this.structures.some(s => s.type === 'church') && avgIntelligence > 18) {
-                 type = 'church';
-            } else if (this.structures.length % 5 === 4) {
-                 type = 'monument';
-            }
-            this.constructionSite = new Structure(this.x + Math.cos(angle) * dist, this.y + Math.sin(angle) * dist, type); 
-        }
+        constructor(x, y, provinceId = null) { super(x, y); this.name = generateCityName(); this.provinceId = provinceId; this.radius = 30; this.territoryRadius = 150; this.structures = []; this.constructionSite = null; this.woodStockpile = 0; this.foodStockpile = 0; this.health = 1000; this.turrets = []; }
+        planStructure() { if (this.constructionSite) return; const angle = random(0, Math.PI * 2); const dist = this.radius + random(20, 40); let type = 'dwelling'; if (day > 3 && this.structures.filter(s => s.type === 'church').length === 0) { type = 'church'; } else if (this.structures.length % 5 === 4) { type = 'monument'; } this.constructionSite = new Structure(this.x + Math.cos(angle) * dist, this.y + Math.sin(angle) * dist, type); }
         buildStructure() { this.structures.push(this.constructionSite); this.constructionSite = null; }
-        draw() {
-            const province = provinces.find(p => p.id === this.provinceId);
-            const provinceColor = province ? province.color : 'rgba(252, 211, 77, 0.3)';
-            if (day > 4) {
-                ctx.strokeStyle = provinceColor;
-                ctx.fillStyle = provinceColor.replace(')', ', 0.05)').replace('rgb', 'rgba');
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.territoryRadius, 0, Math.PI * 2);
-                ctx.stroke();
-                ctx.fill();
-            }
-
-            ctx.strokeStyle = '#ca8a04';
-            ctx.fillStyle = 'rgba(202, 138, 4, 0.1)';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.fill();
-            this.structures.forEach(s => s.draw());
-            if (this.constructionSite) this.constructionSite.draw();
-            for (let i = 0; i < this.woodStockpile; i++) {
-                ctx.fillStyle = '#92400e';
-                ctx.fillRect(this.x - 25 + (i % 5) * 6, this.y - 15 + Math.floor(i / 5) * 4, 5, 3);
-            }
-            for (let i = 0; i < this.foodStockpile; i++) {
-                ctx.fillStyle = '#4ade80';
-                ctx.beginPath();
-                ctx.arc(this.x + 22 - (i % 5) * 5, this.y - 13 + Math.floor(i/5) * 4, 2, 0, Math.PI*2);
-                ctx.fill();
-            }
-        }
+        draw() { const province = provinces.find(p => p.id === this.provinceId); const provinceColor = province ? province.color : 'rgba(252, 211, 77, 0.3)'; ctx.strokeStyle = provinceColor; const fillColor = provinceColor.startsWith('#') ? `rgba(${parseInt(provinceColor.slice(1, 3), 16)}, ${parseInt(provinceColor.slice(3, 5), 16)}, ${parseInt(provinceColor.slice(5, 7), 16)}, 0.05)` : provinceColor.replace(')', ', 0.05)').replace('rgb', 'rgba'); ctx.fillStyle = fillColor; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, this.territoryRadius, 0, Math.PI * 2); ctx.stroke(); ctx.fill(); ctx.strokeStyle = '#ca8a04'; ctx.fillStyle = 'rgba(202, 138, 4, 0.1)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.stroke(); ctx.fill(); this.structures.forEach(s => s.draw()); if (this.constructionSite) this.constructionSite.draw(); this.turrets.forEach(t => t.draw()); }
+    }
+    class Turret extends WorldObject {
+        constructor(x, y, cityId) { super(x, y); this.cityId = cityId; this.range = 120; this.cooldown = 100; this.fireTimer = 0; this.target = null; }
+        update() { this.fireTimer--; if (this.fireTimer > 0) return; const city = cities.find(c => c.id === this.cityId); if (!city || !city.provinceId) return; const potentialTargets = bumbles.filter(b => !b.isDead && b.provinceId !== city.provinceId && getDistance(this.x, this.y, b.x, b.y) < this.range); if (potentialTargets.length > 0) { this.target = potentialTargets[0]; this.fire(); this.fireTimer = this.cooldown; } else { this.target = null; } }
+        fire() { projectiles.push(new Projectile(this.x, this.y, this.target, 3, 5)); }
+        draw() { ctx.fillStyle = '#64748b'; ctx.beginPath(); ctx.arc(this.x, this.y, 8, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#94a3b8'; ctx.beginPath(); ctx.arc(this.x, this.y, 5, 0, Math.PI * 2); ctx.fill(); }
+    }
+    class Projectile extends WorldObject {
+        constructor(x, y, target, speed, damage) { super(x, y); this.target = target; this.speed = speed; this.damage = damage; this.life = 100; }
+        update() { this.life--; if (this.target.isDead || this.life <= 0) { this.isDead = true; return; } const angle = Math.atan2(this.target.y - this.y, this.target.x - this.x); this.x += Math.cos(angle) * this.speed; this.y += Math.sin(angle) * this.speed; if (getDistance(this.x, this.y, this.target.x, this.target.y) < this.target.radius) { this.target.needs.health -= this.damage; this.isDead = true; } }
+        draw() { ctx.fillStyle = '#f87171'; ctx.beginPath(); ctx.arc(this.x, this.y, 3, 0, Math.PI * 2); ctx.fill(); }
     }
 
     class Bumble {
@@ -379,15 +342,14 @@ document.addEventListener('DOMContentLoaded', () => {
             this.id = Math.random().toString(36).substr(2, 9);
             this.gender = Math.random() > 0.5 ? 'male' : 'female';
             this.firstName = getRandomFirstName(this.gender);
-            this.lastName = null;
-            this.x = x || random(world.width/2 - 200, world.width/2 + 200); 
-            this.y = y || random(world.height/2 - 200, world.height/2 + 200);
+            this.lastName = parentTraits ? parentTraits.lastName : getRandomLastName();
+            this.fullName = generateUniqueBumbleName(this.firstName, this.lastName);
+            this.x = x; this.y = y;
             this.radius = random(8, 12);
             this.generation = generation;
             this.isZombie = false;
-            this.isDoctor = false;
-            this.cityId = null;
-            this.provinceId = null;
+            this.isPresident = false;
+            this.cityId = null; this.provinceId = null;
             this.color = this.gender === 'male' ? '#93c5fd' : '#f9a8d4';
             
             if (parentTraits) {
@@ -395,217 +357,173 @@ document.addEventListener('DOMContentLoaded', () => {
                 this.perception = this.mutate(parentTraits.perception, 10);
                 this.lifespan = this.mutate(parentTraits.lifespan, 2);
                 this.intelligence = this.mutate(parentTraits.intelligence, 5);
-                this.fertility = this.mutate(parentTraits.fertility, 0.1);
-                this.lastName = parentTraits.lastName;
+                this.ambition = this.mutate(parentTraits.ambition, 10);
             } else {
                 this.speed = random(0.5, 1.5);
                 this.perception = random(50, 150);
-                this.lifespan = random(10, 15); // Increased base lifespan
+                this.lifespan = random(15, 25);
                 this.intelligence = random(5, 15);
-                this.fertility = random(0.05, 0.2);
+                this.ambition = random(0, 20);
             }
             
             this.isDead = false; this.vx = 0; this.vy = 0;
             this.target = null; this.heldResource = null; this.reproductionCooldown = 0;
             this.isFounder = false;
             this.smoothAngle = 0;
-            this.needs = { health: 120 }; // Increased base health
+            this.needs = { health: 120 };
             this.state = 'wandering';
-            this.prayTimer = 0;
+            this.job = 'nomad';
+            this.explorerTarget = null;
+            this.armyTarget = null;
+            this.warHighlight = null;
+            this.patrolTargetIndex = 0;
         }
         
-        get fullName() { return this.lastName ? `${this.firstName} ${this.lastName}` : this.firstName; }
-        
-        mutate(value, range = 1) {
-            if (Math.random() < settings.mutationChance) {
-                worldStats.mutations++;
-                return Math.max(0.01, value + random(-range, range));
-            }
-            return value;
-        }
-
-        updateNeeds() {
-            if (this.isZombie) this.needs.health -= 0.5;
-            const baseMetabolism = 0.004; // Tweaked for survival
-            const nightPenalty = timeOfDay === 'Night' ? 0.002 : 0;
-            this.needs.health -= (baseMetabolism + nightPenalty);
-        }
+        mutate(value, range = 1) { if (Math.random() < settings.mutationChance) { return Math.max(0.01, value + random(-range, range)); } return value; }
+        updateNeeds() { if (this.isZombie) this.needs.health -= 0.5; this.needs.health -= (timeOfDay === 'Night' ? 0.006 : 0.004); }
 
         updateState() {
-            if (this.isZombie) { this.state = 'hunting'; return; }
-            if (this.intelligence > 25 && !this.isDoctor) this.isDoctor = true;
+            // Priority 0: Special Roles
+            if (this.isPresident) {
+                const myCities = cities.filter(c => c.provinceId === this.provinceId);
+                const isThreat = myCities.some(city => bumbles.some(b => b.provinceId && b.provinceId !== this.provinceId && getDistance(city.x, city.y, b.x, b.y) < city.territoryRadius));
+                this.state = isThreat ? 'defending' : 'patrolling';
+                this.job = 'president';
+                return;
+            }
+            if (this.job === 'scientist') { this.state = 'researching'; return; }
 
-            const nearestZombie = this.findClosest(bumbles.filter(b => b.isZombie), this.perception, false);
-            if (this.isDoctor && nearestZombie) { this.state = 'healing'; return; }
+            // Priority 1: Survival
+            if (this.isZombie) { this.state = 'hunting'; this.job = 'infected'; return; }
+            const nearestZombie = this.findClosest(bumbles.filter(b => b.isZombie), this.perception);
             if (nearestZombie) { this.state = 'fleeing'; this.target = nearestZombie; return; }
-
-            if (day > 3 && provinces.length > 1 && this.provinceId) {
-                const homeCity = cities.find(c => c.id === this.cityId);
-                if(homeCity){
-                    const enemy = this.findClosest(bumbles.filter(b => b.provinceId && b.provinceId !== this.provinceId), homeCity.territoryRadius, false);
-                    if (enemy) {
-                        this.state = 'attacking';
-                        return;
-                    }
-                }
-            }
-            
-            const founder = bumbles.find(b => b.isFounder);
-            const fleeTarget = this.findClosest(resources.filter(r => r instanceof Fire), this.perception, false);
+            const fleeTarget = this.findClosest(resources.filter(r => r instanceof Fire), this.perception);
             if (fleeTarget) { this.state = 'fleeing'; this.target = fleeTarget; return; }
-            
-            if (this.needs.health < 50) { this.state = 'seekingFood'; }
-            else if (this.needs.health > 80 && this.reproductionCooldown <= 0 && (Math.random() < settings.reproductionUrge)) { this.state = 'seekingMate'; }
-            else if (day > 1 && this.intelligence > 15) {
-                const nearestCity = this.findClosest(cities, Infinity, false);
-                if (!this.cityId && (!nearestCity || getDistance(this.x, this.y, nearestCity.x, nearestCity.y) > nearestCity.territoryRadius * 2)) {
-                    if (!bumbles.some(b => b.isFounder && getDistance(this.x, this.y, b.x, b.y) < 500)) {
-                        this.state = 'planning';
-                    }
-                }
-            }
-            
-            if (this.state === 'planning' || this.state === 'assisting' || this.state === 'exploring') return;
+            if (this.needs.health < 50) { this.state = 'seekingFood'; return; }
 
-            if (this.intelligence > 20 && Math.random() < 0.01) { this.state = 'praying'; }
-            else if (this.intelligence > 10) {
-                if (this.heldResource === 'wood') { this.state = 'depositingWood'; } 
-                else if (this.heldResource === 'food') { this.state = 'depositingFood'; }
-                else if (!this.heldResource) {
-                    const nearestCity = this.cityId ? cities.find(c=>c.id === this.cityId) : this.findClosest(cities, this.perception * 2, false);
-                    if (nearestCity) {
-                        if (nearestCity.constructionSite && nearestCity.woodStockpile > 0) { this.state = 'building'; }
-                        else if (Math.random() > 0.5) { this.state = 'harvesting'; }
-                        else { this.state = 'foraging'; }
-                    } else { this.state = 'wandering'; }
-                }
+            // Priority 2: Military
+            const homeCity = this.cityId ? cities.find(c => c.id === this.cityId) : null;
+            if (homeCity && homeCity.provinceId) {
+                const cityIsUnderAttack = bumbles.some(b => b.provinceId && b.provinceId !== this.provinceId && getDistance(this.x, this.y, b.x, b.y) < homeCity.territoryRadius);
+                if (cityIsUnderAttack) { this.state = 'defending'; this.job = 'soldier'; return; }
+                if (this.state === 'attacking' || this.state === 'defending' || this.state === 'formingArmy') { this.job = 'soldier'; return; }
+                if (this.ambition < 10 && bumbles.filter(b => b.cityId === this.cityId).length > 8 && Math.random() < 0.002) { this.state = 'formingArmy'; this.job = 'soldier'; return; }
             }
-            else if (this.state !== 'wandering') { this.state = 'wandering'; }
+            
+            // Priority 3: Reproduction
+            if (this.needs.health > 65 && this.reproductionCooldown <= 0 && Math.random() < settings.reproductionUrge) { this.state = 'seekingMate'; return; }
+
+            // Priority 4: Civilization and Expansion
+            if (homeCity) {
+                this.job = 'worker';
+                const cityPopulation = bumbles.filter(b => b.cityId === this.cityId).length;
+                if (cityPopulation > 10 && (this.ambition > 30 || (cityPopulation > 20 && this.ambition > 15)) && Math.random() < 0.005) {
+                    this.state = 'scouting'; this.job = 'scout'; this.cityId = null; this.provinceId = null;
+                    const angle = random(0, Math.PI * 2);
+                    this.explorerTarget = { x: this.x + Math.cos(angle) * 1500, y: this.y + Math.sin(angle) * 1500 };
+                    return;
+                }
+
+                if (this.heldResource) { this.state = this.heldResource === 'wood' ? 'depositingWood' : 'depositingFood'; return; }
+                if (homeCity.woodStockpile > 5 && Math.random() < 0.005) { this.state = 'plantingTree'; return; }
+                if (homeCity.constructionSite && homeCity.woodStockpile < homeCity.constructionSite.requiredWood) { this.state = 'harvesting'; return; }
+                if (homeCity.constructionSite && homeCity.woodStockpile > 0) { this.state = 'building'; return; }
+                if (homeCity.foodStockpile < cityPopulation * 2) { this.state = 'foraging'; return; }
+            } else { 
+                this.job = 'nomad';
+                if (this.state === 'scouting') {
+                    if (this.explorerTarget && getDistance(this.x, this.y, this.explorerTarget.x, this.explorerTarget.y) < 100) {
+                        this.state = 'planning'; this.explorerTarget = null;
+                    }
+                    this.job = 'scout';
+                    return;
+                }
+                
+                const nearestCity = this.findClosest(cities, this.perception * 3);
+                if (nearestCity && this.ambition < 20 && getDistance(this.x, this.y, nearestCity.x, nearestCity.y) < nearestCity.territoryRadius && Math.random() < 0.01) {
+                    this.cityId = nearestCity.id; this.provinceId = nearestCity.provinceId; this.state = 'foraging';
+                    return;
+                }
+                
+                if (this.intelligence > 10 && day > 0.2 && !bumbles.some(b => b.isFounder)) { this.state = 'planning'; this.job = 'scout'; return; }
+                if (!this.heldResource) { this.state = Math.random() > 0.4 ? 'foraging' : 'harvesting'; return; }
+            }
+            this.state = 'wandering';
         }
         
         performAction() {
             this.target = null;
             switch (this.state) {
-                case 'hunting':
-                    this.findClosest(bumbles.filter(b => !b.isZombie && !b.isDead), this.perception * 2, true);
+                case 'researching': this.target = cities.find(c => c.id === this.cityId); if(this.target && getDistance(this.x, this.y, this.target.x, this.target.y) > this.target.radius) { /* move to city */ } else { this.vx = 0; this.vy = 0; } break;
+                case 'patrolling':
+                    const myCities = cities.filter(c => c.provinceId === this.provinceId);
+                    if (myCities.length > 0) {
+                        if (!this.patrolTargetIndex || this.patrolTargetIndex >= myCities.length) this.patrolTargetIndex = 0;
+                        this.target = myCities[this.patrolTargetIndex];
+                        if (getDistance(this.x, this.y, this.target.x, this.target.y) < this.target.radius * 2) this.patrolTargetIndex++;
+                    }
+                    break;
+                case 'hunting': this.target = this.findClosest(bumbles.filter(b => !b.isZombie && !b.isDead)); break;
+                case 'formingArmy': this.target = cities.find(c => c.id === this.cityId); break;
+                case 'defending':
+                    const homeCities = cities.filter(c => c.provinceId === this.provinceId);
+                    const threatenedCity = homeCities.find(city => bumbles.some(b => b.provinceId && b.provinceId !== this.provinceId && getDistance(city.x, city.y, b.x, b.y) < city.territoryRadius));
+                    this.target = threatenedCity || this.findClosest(bumbles.filter(b => b.provinceId && b.provinceId !== this.provinceId));
                     break;
                 case 'attacking':
-                    const enemies = bumbles.filter(b => b.provinceId && b.provinceId !== this.provinceId && !b.isDead);
-                    this.findClosest(enemies, this.perception * 1.5, true);
-                    if (!this.target) {
-                        const enemyCities = cities.filter(c => c.provinceId !== this.provinceId);
-                        this.target = this.findClosest(enemyCities, this.perception * 3, false);
+                    if (this.armyTarget) {
+                        if (getDistance(this.x, this.y, this.armyTarget.x, this.armyTarget.y) < this.armyTarget.territoryRadius) {
+                            const enemies = bumbles.filter(b => b.provinceId === this.armyTarget.provinceId && !b.isDead);
+                            this.target = this.findClosest(enemies, this.perception * 1.5) || this.armyTarget;
+                        } else { this.target = this.armyTarget; }
                     }
                     if (!this.target) this.state = 'wandering';
                     break;
-                case 'healing':
-                    this.findClosest(bumbles.filter(b => b.isZombie), this.perception * 1.5, true);
-                    break;
-                case 'seekingFood':
-                    const nearestCityWithFood = this.cityId ? cities.find(c=>c.id === this.cityId && c.foodStockpile > 0) : this.findClosest(cities.filter(c => c.foodStockpile > 0), this.perception * 2, false);
-                    if (nearestCityWithFood) { this.target = nearestCityWithFood; } 
-                    else { this.findClosest(foods, this.perception, true); }
-                    break;
-                case 'seekingMate':
-                    const potentialMates = bumbles.filter(b => b.id !== this.id && b.gender !== this.gender && !b.isDead && b.reproductionCooldown <= 0 && b.state === 'seekingMate');
-                    this.findClosest(potentialMates, this.perception, true);
-                    break;
-                case 'harvesting':
-                    this.findClosest(resources.filter(r => r instanceof Tree), this.perception * 1.5, true);
-                    break;
-                case 'foraging':
-                    this.findClosest(foods, this.perception * 1.5, true);
-                    break;
-                case 'depositingWood':
-                case 'depositingFood':
-                    this.target = cities.find(c => c.id === this.cityId) || this.findClosest(cities, this.perception * 2, false);
-                    break;
-                case 'building':
-                    const nearestCity = this.cityId ? cities.find(c=>c.id === this.cityId) : this.findClosest(cities, this.perception * 2, false);
-                    if (nearestCity && nearestCity.constructionSite) { this.target = nearestCity; } 
-                    else { this.state = 'wandering'; }
-                    break;
-                case 'praying':
-                    const churches = cities.flatMap(c => c.structures.filter(s => s.type === 'church' && s.isComplete));
-                    this.findClosest(churches, this.perception * 3, true);
-                    if (this.target) { this.prayTimer = 300; this.target.isPraying = true; } 
-                    else { this.state = 'wandering'; }
-                    break;
-                case 'exploring':
-                    if (!this.explorerTarget || getDistance(this.x, this.y, this.explorerTarget.x, this.explorerTarget.y) < 50) {
-                        this.state = 'planning';
-                    } else {
-                        this.target = this.explorerTarget;
+                case 'seekingFood': this.target = this.findClosest(foods, this.perception); break;
+                case 'seekingMate': this.target = this.findClosest(bumbles.filter(b => b.id !== this.id && b.gender !== this.gender && !b.isDead && b.reproductionCooldown <= 0)); break;
+                case 'harvesting': this.target = this.findClosest(resources.filter(r => r instanceof Tree)); break;
+                case 'foraging': this.target = this.findClosest(foods); break;
+                case 'plantingTree':
+                    const homeCity = cities.find(c => c.id === this.cityId);
+                    if (homeCity) {
+                        const angle = random(0, Math.PI * 2);
+                        const dist = random(homeCity.radius + 10, homeCity.territoryRadius - 10);
+                        resources.push(new Tree(homeCity.x + Math.cos(angle) * dist, homeCity.y + Math.sin(angle) * dist));
+                        homeCity.woodStockpile--;
+                        this.state = 'wandering';
                     }
                     break;
-                case 'planning':
-                    this.isFounder = true; this.vx = 0; this.vy = 0;
-                    break;
-                case 'assisting':
-                    this.target = bumbles.find(b => b.isFounder);
-                    break;
-                case 'fleeing':
-                    break;
-                case 'wandering':
-                default:
-                    if (Math.random() < 0.02) { this.vx = random(-this.speed*0.5, this.speed*0.5); this.vy = random(-this.speed*0.5, this.speed*0.5); }
-                    break;
+                case 'depositingWood': case 'depositingFood': this.target = cities.find(c => c.id === this.cityId); break;
+                case 'building': this.target = cities.find(c => c.id === this.cityId)?.constructionSite; break;
+                case 'scouting': this.target = this.explorerTarget; break;
+                case 'planning': this.isFounder = true; this.vx = 0; this.vy = 0; break;
+                case 'wandering': default: if (Math.random() < 0.02) { this.vx = random(-this.speed, this.speed); this.vy = random(-this.speed, this.speed); } break;
             }
         }
 
-        findClosest(targets, range, setTarget = true) {
+        findClosest(targets, range = Infinity) {
             let closest = null, minDist = range;
-            for (const t of targets) {
-                if (!t || t.isDead) continue;
-                const d = getDistance(this.x, this.y, t.x, t.y);
-                if (d < minDist) { minDist = d; closest = t; }
-            }
-            if (setTarget) this.target = closest;
+            for (const t of targets) { if (!t || t.isDead) continue; const d = getDistance(this.x, this.y, t.x, t.y); if (d < minDist) { minDist = d; closest = t; } }
             return closest;
         }
 
         update() {
             if (this.isDead) return;
-            if (day >= this.lifespan) { this.die(); return; }
-            
+            if (day >= this.lifespan && !this.isPresident) { this.die(); return; }
             this.updateNeeds();
             if (this.needs.health <= 0) { this.die(); return; }
             if (this.reproductionCooldown > 0) this.reproductionCooldown--;
-
-            if (this.prayTimer > 0) {
-                this.prayTimer--;
-                this.vx = 0; this.vy = 0;
-                if (this.prayTimer <= 0 && this.target && this.target.isPraying) {
-                    this.target.isPraying = false;
-                    this.state = 'wandering';
-                }
-                return;
-            }
-
-            if (frameCount % 60 === 0) this.updateState();
+            if (frameCount % 60 === 0 || !this.target || this.state === 'wandering') this.updateState();
             this.performAction();
-
-            const effectiveSpeed = this.isZombie ? this.speed * 0.7 : this.speed;
-            if (this.target) {
+            if (this.target && this.state !== 'researching') {
                 const angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
-                if (this.state === 'fleeing') {
-                    this.vx = -Math.cos(angle) * this.speed;
-                    this.vy = -Math.sin(angle) * this.speed;
-                } else {
-                    this.vx = Math.cos(angle) * effectiveSpeed;
-                    this.vy = Math.sin(angle) * effectiveSpeed;
-                }
-            } else if (this.state !== 'wandering' && this.state !== 'planning') {
-                if (Math.random() < 0.05) { this.vx = random(-this.speed*0.2, this.speed*0.2); this.vy = random(-this.speed*0.2, this.speed*0.2); }
+                if (this.state === 'fleeing') { this.vx = -Math.cos(angle) * this.speed * 1.5; this.vy = -Math.sin(angle) * this.speed * 1.5; } 
+                else { this.vx = Math.cos(angle) * this.speed; this.vy = Math.sin(angle) * this.speed; }
             }
-            
-            this.x += this.vx; this.y += this.vy;
-            if (this.x < this.radius || this.x > world.width - this.radius) this.vx *= -1;
-            if (this.y < this.radius || this.y > world.height - this.radius) this.vy *= -1;
-
-            this.radius = 8 + Math.sin(frameCount * 0.1) * 0.5;
+            this.x = Math.max(this.radius, Math.min(world.width - this.radius, this.x + this.vx));
+            this.y = Math.max(this.radius, Math.min(world.height - this.radius, this.y + this.vy));
             let targetAngle = Math.atan2(this.vy, this.vx);
-            if (Math.abs(this.vx) < 0.1 && Math.abs(this.vy) < 0.1) targetAngle = this.smoothAngle || 0;
+            if(Math.abs(this.vx) < 0.01 && Math.abs(this.vy) < 0.01) targetAngle = this.smoothAngle;
             let angleDiff = targetAngle - (this.smoothAngle || 0);
             while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
             while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
@@ -613,127 +531,90 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         reproduce(partner) {
-            if (this.isZombie || partner.isZombie) return;
-            if (this.needs.health > 80 && partner.needs.health > 80 && this.reproductionCooldown <= 0 && partner.reproductionCooldown <= 0) {
-                const energyCost = 30;
-                const cooldown = 150;
-                this.needs.health -= energyCost; partner.needs.health -= energyCost;
-                this.reproductionCooldown = cooldown; partner.reproductionCooldown = cooldown;
-                this.state = 'wandering'; partner.state = 'wandering';
-                let familyName = this.lastName || partner.lastName || getRandomLastName();
-                this.lastName = familyName; partner.lastName = familyName;
-                
-                const createChild = () => {
-                    const childTraits = { speed: (this.speed + partner.speed) / 2, perception: (this.perception + partner.perception) / 2, lifespan: (this.lifespan + partner.lifespan) / 2, intelligence: (this.intelligence + partner.intelligence) / 2, fertility: (this.fertility + partner.fertility) / 2, lastName: familyName };
-                    const childGen = Math.max(this.generation, partner.generation) + 1;
-                    const newBumble = new Bumble(this.x, this.y, childGen, childTraits);
-                    newBumble.cityId = this.cityId || partner.cityId;
-                    newBumble.provinceId = this.provinceId || partner.provinceId;
-                    bumbles.push(newBumble);
-                };
-
-                createChild();
-                while (Math.random() < this.fertility) {
-                    createChild();
-                }
+            if (bumbles.length >= GLOBAL_POP_CAP) return;
+            const energyCost = 30, cooldown = 800;
+            this.needs.health -= energyCost; partner.needs.health -= energyCost;
+            this.reproductionCooldown = cooldown; partner.reproductionCooldown = cooldown;
+            this.state = 'wandering'; partner.state = 'wandering';
+            const childTraits = { speed: (this.speed + partner.speed) / 2, perception: (this.perception + partner.perception) / 2, lifespan: (this.lifespan + partner.lifespan) / 2, intelligence: (this.intelligence + partner.intelligence) / 2, ambition: (this.ambition + partner.ambition) / 2, lastName: this.lastName };
+            const newBumble = new Bumble(this.x, this.y, Math.max(this.generation, partner.generation) + 1, childTraits);
+            const homeCity = this.cityId ? cities.find(c => c.id === this.cityId) : null;
+            if (homeCity && getDistance(this.x, this.y, homeCity.x, homeCity.y) < homeCity.territoryRadius) {
+                newBumble.cityId = this.cityId; newBumble.provinceId = this.provinceId;
             }
+            bumbles.push(newBumble);
         }
         
-        die() { this.isDead = true; worldStats.deaths++; }
+        die() { this.isDead = true; }
         
         draw() {
             ctx.save();
             ctx.translate(this.x, this.y);
-
-            if (this.state === 'attacking') {
-                ctx.beginPath();
-                ctx.arc(0, 0, this.radius + 3, 0, Math.PI * 2);
-                const province = provinces.find(p => p.id === this.provinceId);
-                ctx.strokeStyle = province ? province.color : 'rgba(239, 68, 68, 0.8)';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-            }
-
-            ctx.beginPath();
-            ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-            ctx.fillStyle = this.isZombie ? '#4ade80' : this.color;
-            ctx.fill();
-
-            if (this.isFounder) {
-                ctx.strokeStyle = '#fde047';
-                ctx.lineWidth = 3;
-                ctx.stroke();
-            }
             
-            if (this.heldResource === 'wood') {
-                ctx.fillStyle = '#92400e';
-                ctx.fillRect(-5, -this.radius - 5, 10, 5);
-            } else if (this.heldResource === 'food') {
-                ctx.fillStyle = '#4ade80';
+            const displayRadius = this.isPresident ? this.radius * 1.25 : this.radius;
+
+            if (this.isPresident) {
+                ctx.fillStyle = '#FFD700';
+                ctx.strokeStyle = '#B8860B';
+                ctx.lineWidth = 1;
+                const crownY = -displayRadius - 5;
+                const crownWidth = displayRadius * 1.2;
+                const crownHeight = displayRadius * 0.6;
                 ctx.beginPath();
-                ctx.arc(0, -this.radius - 3, 3, 0, Math.PI*2);
+                ctx.moveTo(-crownWidth / 2, crownY);
+                ctx.lineTo(-crownWidth / 2, crownY - crownHeight);
+                ctx.lineTo(-crownWidth * 0.2, crownY - crownHeight * 0.6);
+                ctx.lineTo(0, crownY - crownHeight);
+                ctx.lineTo(crownWidth * 0.2, crownY - crownHeight * 0.6);
+                ctx.lineTo(crownWidth / 2, crownY - crownHeight);
+                ctx.lineTo(crownWidth / 2, crownY);
+                ctx.closePath();
                 ctx.fill();
+                ctx.stroke();
             }
 
-            const angle = this.smoothAngle ? this.smoothAngle - Math.PI/2 : 0;
-            ctx.rotate(angle);
-            const eye1X = this.radius * 0.5, eye1Y = -this.radius * 0.2;
-            const eye2X = -this.radius * 0.5, eye2Y = -this.radius * 0.2;
-            const eyeRadius = this.radius * 0.3;
-            ctx.beginPath(); ctx.arc(eye1X, eye1Y, eyeRadius, 0, Math.PI * 2); ctx.fillStyle = 'white'; ctx.fill();
-            ctx.beginPath(); ctx.arc(eye2X, eye2Y, eyeRadius, 0, Math.PI * 2); ctx.fillStyle = 'white'; ctx.fill();
-            if (!this.isZombie) {
-                const pupilRadius = eyeRadius * 0.5;
-                ctx.beginPath(); ctx.arc(eye1X, eye1Y, pupilRadius, 0, Math.PI * 2); ctx.fillStyle = 'black'; ctx.fill();
-                ctx.beginPath(); ctx.arc(eye2X, eye2Y, pupilRadius, 0, Math.PI * 2); ctx.fillStyle = 'black'; ctx.fill();
-            }
-            ctx.rotate(-angle);
-
-            if (this.isDoctor) {
-                ctx.fillStyle = 'white';
-                ctx.fillRect(-this.radius * 0.2, -this.radius * 0.6, this.radius * 0.4, this.radius * 1.2);
-                ctx.fillRect(-this.radius * 0.6, -this.radius * 0.2, this.radius * 1.2, this.radius * 0.4);
-            }
-
+            if(this.warHighlight) { ctx.beginPath(); ctx.arc(0, 0, displayRadius + 4, 0, Math.PI * 2); ctx.fillStyle = this.warHighlight; ctx.shadowColor = this.warHighlight; ctx.shadowBlur = 15; ctx.fill(); ctx.shadowBlur = 0; }
+            ctx.beginPath(); ctx.arc(0, 0, displayRadius, 0, Math.PI * 2); ctx.fillStyle = this.isZombie ? '#4ade80' : this.color; ctx.fill();
+            if (this.isFounder) { ctx.strokeStyle = '#fde047'; ctx.lineWidth = 3; ctx.stroke(); }
+            if (this.job === 'scientist') { ctx.fillStyle = 'white'; ctx.fillRect(-displayRadius * 0.2, -displayRadius * 0.6, displayRadius * 0.4, displayRadius * 1.2); ctx.fillRect(-displayRadius * 0.6, -displayRadius * 0.2, displayRadius * 1.2, displayRadius * 0.4); }
+            
+            ctx.rotate(this.smoothAngle);
+            const eyeOffsetX = displayRadius * 0.3, eyeOffsetY = -displayRadius * 0.2, eyeRadius = displayRadius * 0.25, pupilRadius = eyeRadius * 0.5;
+            ctx.beginPath(); ctx.arc(eyeOffsetX, eyeOffsetY, eyeRadius, 0, Math.PI * 2); ctx.fillStyle = 'white'; ctx.fill();
+            ctx.beginPath(); ctx.arc(eyeOffsetX, eyeOffsetY, pupilRadius, 0, Math.PI * 2); ctx.fillStyle = 'black'; ctx.fill();
+            ctx.beginPath(); ctx.arc(-eyeOffsetX, eyeOffsetY, eyeRadius, 0, Math.PI * 2); ctx.fillStyle = 'white'; ctx.fill();
+            ctx.beginPath(); ctx.arc(-eyeOffsetX, eyeOffsetY, pupilRadius, 0, Math.PI * 2); ctx.fillStyle = 'black'; ctx.fill();
+            
             ctx.restore();
         }
     }
 
     // --- SIMULATION CORE LOGIC ---
-    function createResourcePatches() {
-        resourcePatches = [];
-        for (let i = 0; i < 15; i++) {
-            resourcePatches.push({
-                x: random(0, world.width),
-                y: random(0, world.height),
-                radius: random(300, 600)
-            });
-        }
-    }
-
     function init() {
-        const container = document.getElementById('simulation-container'); canvas.width = container.clientWidth; canvas.height = container.clientHeight;
-        bumbles = []; foods = []; resources = []; cities = []; provinces = []; day = 0; frameCount = 0; worldStats = { deaths: 0, mutations: 0, wars: 0 };
-        createResourcePatches();
-        for (let i = 0; i < settings.initialPopulation; i++) bumbles.push(new Bumble());
-        
-        // Center camera on initial bumbles
-        const avgX = bumbles.reduce((sum, b) => sum + b.x, 0) / bumbles.length;
-        const avgY = bumbles.reduce((sum, b) => sum + b.y, 0) / bumbles.length;
-        camera.scale = 1.5; // Start a bit more zoomed in
-        camera.x = canvas.width / 2 - avgX * camera.scale;
-        camera.y = canvas.height / 2 - avgY * camera.scale;
-
+        bumbles = []; foods = []; resources = []; cities = []; provinces = []; projectiles = []; day = 0; frameCount = 0; nameCounts = {};
+        const numClusters = settings.treeClusterDensity;
+        const clusterRadius = 400;
+        for (let i = 0; i < numClusters; i++) {
+            const clusterX = random(clusterRadius, world.width - clusterRadius), clusterY = random(clusterRadius, world.height - clusterRadius);
+            for (let j = 0; j < random(8, 15); j++) {
+                const angle = random(0, Math.PI * 2), dist = random(0, clusterRadius * 0.8);
+                resources.push(new Tree(clusterX + Math.cos(angle) * dist, clusterY + Math.sin(angle) * dist));
+            }
+        }
+        const startX = world.width / 2, startY = world.height / 2;
+        for (let i = 0; i < settings.initialPopulation; i++) { bumbles.push(new Bumble(startX + random(-50, 50), startY + random(-50, 50))); }
+        camera.scale = 1.5;
+        camera.x = canvas.width / 2 - startX * camera.scale;
+        camera.y = canvas.height / 2 - startY * camera.scale;
         updateDayNightCycle(true);
+        updateUI();
+        drawSimulation();
     }
 
     function updateDayNightCycle(force = false) {
         const dayProgress = (frameCount % framesPerDay) / framesPerDay;
         let newTimeOfDay = 'Day';
-        if (dayProgress > 0.9) newTimeOfDay = 'Dawn';
-        else if (dayProgress > 0.5) newTimeOfDay = 'Night';
-        else if (dayProgress > 0.4) newTimeOfDay = 'Dusk';
-        
+        if (dayProgress > 0.9) newTimeOfDay = 'Dawn'; else if (dayProgress > 0.5) newTimeOfDay = 'Night'; else if (dayProgress > 0.4) newTimeOfDay = 'Dusk';
         if (newTimeOfDay !== timeOfDay || force) {
             timeOfDay = newTimeOfDay;
             let bgStyle;
@@ -747,143 +628,149 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    function checkCityFormation() {
-        if (day < 1) return;
+    function manageCivilization() {
+        // City and Province Formation
         const founders = bumbles.filter(b => b.isFounder);
         founders.forEach(founder => {
-            if (founder.cityId) { founder.isFounder = false; return; }
-            const assistants = bumbles.filter(b => b.id !== founder.id && !b.cityId && getDistance(b.x, b.y, founder.x, founder.y) < 50);
+            const tooClose = cities.some(c => getDistance(founder.x, founder.y, c.x, c.y) < c.territoryRadius * 2.5);
+            if (tooClose) { founder.isFounder = false; founder.state = 'wandering'; return; }
+            const assistants = bumbles.filter(b => b.id !== founder.id && !b.cityId && getDistance(b.x, b.y, founder.x, founder.y) < 80);
             if (assistants.length >= 2) {
-                let provinceId = founder.provinceId;
-                if (!provinceId) {
-                    const newProvince = { id: Math.random().toString(36).substr(2, 9), name: `${founder.lastName} Province`, color: provinceColors[provinces.length % provinceColors.length] };
-                    provinces.push(newProvince);
-                    provinceId = newProvince.id;
-                }
-                const newCity = new City(founder.x, founder.y, provinceId);
+                const newCity = new City(founder.x, founder.y);
                 cities.push(newCity);
-                founder.isFounder = false;
-                founder.state = 'harvesting';
-                founder.cityId = newCity.id;
-                founder.provinceId = provinceId;
-                assistants.forEach(a => {
-                    a.state = 'harvesting';
-                    a.cityId = newCity.id;
-                    a.provinceId = provinceId;
+                [founder, ...assistants].forEach(b => {
+                    b.isFounder = false; b.state = 'harvesting'; b.cityId = newCity.id;
                 });
             }
         });
-    }
 
-    function manageCities() {
         cities.forEach(city => {
-            if (frameCount % 2000 === 0) city.planStructure();
-            
-            const cityBumbles = bumbles.filter(b => b.cityId === city.id);
-            if(cityBumbles.length > 8 && frameCount % 3000 === 0) {
-                const explorer = cityBumbles.find(b => b.intelligence > 15 && !b.isDoctor && b.state !== 'exploring');
-                if(explorer) {
-                    explorer.state = 'exploring';
-                    explorer.explorerTarget = {
-                        x: explorer.x + random(-2000, 2000),
-                        y: explorer.y + random(-2000, 2000)
+            const cityBumbles = bumbles.filter(b => b.cityId === city.id && !b.isDead);
+            const population = cityBumbles.length;
+            if (provinces.length < 4 && !city.provinceId && population >= 20) {
+                const newProvince = { id: Math.random().toString(36).substr(2, 9), name: `${getRandomLastName()} Province`, color: provinceColors[provinces.length % provinceColors.length], presidentId: null };
+                const president = cityBumbles.sort((a, b) => b.generation - a.generation)[0];
+                if(president) {
+                    president.isPresident = true;
+                    newProvince.presidentId = president.id;
+                }
+                provinces.push(newProvince);
+                city.provinceId = newProvince.id;
+                cityBumbles.forEach(b => b.provinceId = newProvince.id);
+            }
+
+            // Colonization and Demographics
+            if (population >= CITY_POP_CAP) {
+                // Send scouts if global pop allows
+                if (bumbles.length < GLOBAL_POP_CAP - 2) {
+                    const maleScout = cityBumbles.find(b => b.gender === 'male' && !b.isPresident && b.job !== 'scientist' && b.job !== 'scout');
+                    const femaleScout = cityBumbles.find(b => b.gender === 'female' && !b.isPresident && b.job !== 'scientist' && b.job !== 'scout');
+                    if (maleScout && femaleScout) {
+                        [maleScout, femaleScout].forEach(scout => {
+                            scout.state = 'scouting'; scout.job = 'scout'; scout.cityId = null; scout.provinceId = null;
+                            const angle = random(0, Math.PI * 2);
+                            scout.explorerTarget = { x: scout.x + Math.cos(angle) * 1500, y: scout.y + Math.sin(angle) * 1500 };
+                        });
                     }
                 }
+                // Assign scientists
+                const scientists = cityBumbles.filter(b => b.job === 'scientist');
+                if (scientists.length < 3) {
+                    const candidates = cityBumbles.filter(b => b.job !== 'scientist' && !b.isPresident).sort((a, b) => b.intelligence - a.intelligence);
+                    candidates.slice(0, 3 - scientists.length).forEach(b => b.job = 'scientist');
+                }
+            }
+        });
+
+        // Rebellion Logic
+        const activeProvinces = provinces.filter(p => cities.some(c => c.provinceId === p.id && bumbles.some(b => b.provinceId === p.id)));
+        if (activeProvinces.length === 1 && cities.length > 1) {
+            const rulingProvinceId = activeProvinces[0].id;
+            const potentialRebels = bumbles.filter(b => b.provinceId === rulingProvinceId && !b.isPresident && b.job !== 'scout').sort((a, b) => b.ambition - a.ambition);
+            if (potentialRebels.length > 2) {
+                potentialRebels.slice(0, 2).forEach(rebel => {
+                    rebel.state = 'scouting'; rebel.job = 'scout'; rebel.cityId = null; rebel.provinceId = null;
+                    const angle = random(0, Math.PI * 2);
+                    rebel.explorerTarget = { x: rebel.x + Math.cos(angle) * 2000, y: rebel.y + Math.sin(angle) * 2000 };
+                });
+            }
+        }
+
+        // Evolution: Turrets
+        if (day > 20) {
+            const sortedCities = cities.filter(c => c.provinceId).sort((a, b) => bumbles.filter(bum => bum.cityId === b.id).length - bumbles.filter(bum => bum.cityId === a.id).length);
+            const strongestCities = sortedCities.slice(0, Math.ceil(cities.length * 0.5));
+            strongestCities.forEach(city => {
+                if (city.turrets.length < 4) {
+                    for (let i = 0; i < 4; i++) {
+                        const angle = (i / 4) * Math.PI * 2;
+                        city.turrets.push(new Turret(city.x + Math.cos(angle) * city.radius, city.y + Math.sin(angle) * city.radius, city.id));
+                    }
+                }
+            });
+        }
+    }
+
+    function manageArmies() {
+        bumbles.forEach(b => b.warHighlight = null);
+        
+        // President commands soldiers
+        provinces.forEach(province => {
+            const myCities = cities.filter(c => c.provinceId === province.id);
+            const threatenedCity = myCities.find(city => bumbles.some(b => b.provinceId && b.provinceId !== province.id && getDistance(city.x, city.y, b.x, b.y) < city.territoryRadius));
+            if (threatenedCity) {
+                const soldiers = bumbles.filter(b => b.provinceId === province.id && b.job === 'soldier' && b.state !== 'attacking');
+                soldiers.forEach(soldier => { soldier.state = 'attacking'; soldier.armyTarget = threatenedCity; });
+            }
+        });
+
+        // Armies form and attack
+        for (const city of cities) {
+            if (!city.provinceId) continue;
+            const army = bumbles.filter(b => b.cityId === city.id && b.state === 'formingArmy');
+            if (army.length > 4) {
+                const enemyCities = cities.filter(c => c.provinceId && c.provinceId !== city.provinceId);
+                if (enemyCities.length > 0) {
+                    const targetCity = enemyCities[Math.floor(Math.random() * enemyCities.length)];
+                    army.forEach(soldier => { soldier.state = 'attacking'; soldier.armyTarget = targetCity; });
+                }
+            }
+        }
+
+        // Highlight warring bumbles
+        bumbles.forEach(b => {
+            if (b.state === 'attacking' || b.state === 'defending' || (b.isPresident && b.state === 'defending')) {
+                const province = provinces.find(p => p.id === b.provinceId);
+                if (province) b.warHighlight = province.color;
             }
         });
     }
 
     function updateSimulation() {
-        if (frameCount % settings.foodSpawnInterval === 0) {
-            const patch = resourcePatches[Math.floor(Math.random() * resourcePatches.length)];
-            const angle = random(0, Math.PI * 2);
-            const dist = random(0, patch.radius);
-            foods.push(new Food(patch.x + Math.cos(angle) * dist, patch.y + Math.sin(angle) * dist));
-        }
-        if (frameCount % 500 === 0) {
-            const patch = resourcePatches[Math.floor(Math.random() * resourcePatches.length)];
-            const angle = random(0, Math.PI * 2);
-            const dist = random(0, patch.radius);
-            resources.push(new Tree(patch.x + Math.cos(angle) * dist, patch.y + Math.sin(angle) * dist));
-        }
-        
-        manageCities();
+        resources.forEach(r => r.update && r.update());
+        cities.forEach(c => { c.planStructure && c.planStructure(); c.turrets.forEach(t => t.update()); });
+        projectiles.forEach(p => p.update());
+        projectiles = projectiles.filter(p => !p.isDead);
         bumbles.forEach(b => b.update());
-        if (frameCount % 10 === 0) checkCityFormation();
+        if (frameCount % 100 === 0) manageCivilization();
+        if (frameCount % 300 === 0) manageArmies();
 
+        // Scientist Actions
+        const scientists = bumbles.filter(b => b.job === 'scientist' && !b.isDead);
+        if (scientists.length > 0) {
+            const infectedMap = new Map();
+            bumbles.forEach(b => { if (b.isZombie && b.cityId) { if (!infectedMap.has(b.cityId)) infectedMap.set(b.cityId, []); infectedMap.get(b.cityId).push(b); } });
+            scientists.forEach(scientist => { if (infectedMap.has(scientist.cityId)) { infectedMap.get(scientist.cityId).forEach(infected => infected.isZombie = false); infectedMap.delete(scientist.cityId); } });
+        }
+
+        // Interactions and Collisions
         for (let i = bumbles.length - 1; i >= 0; i--) {
             const b = bumbles[i];
             if (b.isDead) continue;
-            
-            for (let j = foods.length - 1; j >= 0; j--) { 
-                if (getDistance(b.x, b.y, foods[j].x, foods[j].y) < b.radius) { 
-                    if (b.state === 'seekingFood') {
-                        b.needs.health = Math.min(120, b.needs.health + foods[j].energy);
-                    } else if (b.state === 'foraging' && !b.heldResource) {
-                        b.heldResource = 'food';
-                    }
-                    b.target = null; 
-                    foods.splice(j, 1);
-                    break; 
-                } 
-            }
-            for (let j = resources.length - 1; j >= 0; j--) {
-                const r = resources[j];
-                if (r instanceof Tree && getDistance(b.x, b.y, r.x, r.y) < b.radius + r.radius && !b.heldResource && b.state === 'harvesting') {
-                    r.woodAmount--;
-                    b.heldResource = 'wood';
-                    if (r.woodAmount <= 0) resources.splice(j, 1);
-                    b.target = null;
-                }
-            }
-            for (let j = cities.length - 1; j >= 0; j--) {
-                const c = cities[j];
-                if (getDistance(b.x, b.y, c.x, c.y) < c.radius) {
-                    if (b.cityId === null) { b.cityId = c.id; b.provinceId = c.provinceId; }
-                    if (b.heldResource === 'wood' && b.state === 'depositingWood') {
-                        c.woodStockpile++; b.heldResource = null; b.target = null;
-                    } else if (b.heldResource === 'food' && b.state === 'depositingFood') {
-                        c.foodStockpile++; b.heldResource = null; b.target = null;
-                    } else if (b.state === 'seekingFood' && c.foodStockpile > 0) {
-                        c.foodStockpile--; b.needs.health = 120; b.target = null; b.state = 'wandering';
-                    } else if (b.state === 'building' && !b.heldResource && c.woodStockpile > 0) {
-                        c.woodStockpile--; b.heldResource = 'wood'; b.target = c.constructionSite;
-                    } else if (b.state === 'attacking' && b.provinceId !== c.provinceId) {
-                        c.health -= 1;
-                        if (c.health <= 0) {
-                            c.provinceId = b.provinceId;
-                            c.health = 1000;
-                            bumbles.filter(bum => bum.cityId === c.id).forEach(bum => bum.provinceId = b.provinceId);
-                        }
-                    }
-                }
-                
-                if (c.constructionSite && getDistance(b.x, b.y, c.constructionSite.x, c.constructionSite.y) < b.radius && b.heldResource === 'wood') {
-                    b.heldResource = null;
-                    c.constructionSite.addWood();
-                    b.intelligence += 0.2;
-                    if (c.constructionSite.isComplete) c.buildStructure();
-                    b.target = null;
-                }
-            }
-
-            for (let j = i - 1; j >= 0; j--) {
-                const b2 = bumbles[j];
-                if (b2.isDead) continue;
-                if (getDistance(b.x, b.y, b2.x, b2.y) < b.radius + b2.radius) {
-                    if (b.state === 'seekingMate' && b2.state === 'seekingMate' && b.gender !== b2.gender) {
-                        b.reproduce(b2);
-                    }
-                    else if (b.state === 'attacking' && b2.provinceId && b.provinceId !== b2.provinceId) {
-                        b2.needs.health -= 0.5;
-                        if(worldStats.wars === 0) worldStats.wars = 1;
-                    }
-                    else if (b.isDoctor && b2.isZombie) { b2.isZombie = false; b.state = 'wandering'; }
-                    else if (b2.isDoctor && b.isZombie) { b.isZombie = false; b2.state = 'wandering'; }
-                    else if (b.isZombie && !b2.isZombie) b2.isZombie = true;
-                    else if (b2.isZombie && !b.isZombie) b.isZombie = true;
-                }
-            }
+            for (let j = foods.length - 1; j >= 0; j--) { if (getDistance(b.x, b.y, foods[j].x, foods[j].y) < b.radius + foods[j].radius) { if (b.state === 'seekingFood') { b.needs.health = Math.min(120, b.needs.health + foods[j].energy); b.state = 'wandering'; } else if ((b.state === 'foraging' || b.state === 'harvesting') && !b.heldResource) { b.heldResource = 'food'; } b.target = null; foods.splice(j, 1); break; } }
+            for (let j = resources.length - 1; j >= 0; j--) { const r = resources[j]; if (r instanceof Tree && getDistance(b.x, b.y, r.x, r.y) < b.radius + r.radius && !b.heldResource && (b.state === 'harvesting' || b.state === 'foraging')) { r.woodAmount--; b.heldResource = 'wood'; if (r.woodAmount <= 0) resources.splice(j, 1); b.target = null; } }
+            for (let j = cities.length - 1; j >= 0; j--) { const c = cities[j]; if (getDistance(b.x, b.y, c.x, c.y) < c.radius) { if (b.cityId === null) { b.cityId = c.id; b.provinceId = c.provinceId; } if (b.heldResource && (b.state === 'depositingFood' || b.state === 'depositingWood')) { c[b.heldResource + 'Stockpile']++; b.heldResource = null; b.state = 'wandering'; } if (b.state === 'seekingFood' && c.foodStockpile > 0) { c.foodStockpile--; b.needs.health = 120; b.state = 'wandering'; } if ((b.job === 'soldier' || b.isPresident) && b.provinceId !== c.provinceId) { c.health -= 1; if (c.health <= 0) { c.provinceId = b.provinceId; c.health = 500; bumbles.filter(bum => bum.cityId === c.id).forEach(bum => bum.provinceId = b.provinceId); } } } if (c.constructionSite && getDistance(b.x, b.y, c.constructionSite.x, c.constructionSite.y) < b.radius + 10 && b.heldResource === 'wood') { b.heldResource = null; c.constructionSite.addWood(); if (c.constructionSite.isComplete) c.buildStructure(); b.state = 'wandering'; } }
+            for (let j = i - 1; j >= 0; j--) { const b2 = bumbles[j]; if (b2.isDead) continue; if (getDistance(b.x, b.y, b2.x, b2.y) < b.radius + b2.radius) { if (b.state === 'seekingMate' && b2.state === 'seekingMate' && b.gender !== b2.gender) b.reproduce(b2); else if ((b.job === 'soldier' || b.isPresident) && b2.provinceId && b.provinceId !== b2.provinceId) b2.needs.health -= 0.5; else if (b.isZombie && !b2.isZombie && b2.job !== 'scientist') b2.isZombie = true; else if (b2.isZombie && !b.isZombie && b.job !== 'scientist') b.isZombie = true; } }
         }
         
         bumbles = bumbles.filter(b => !b.isDead);
@@ -896,203 +783,71 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.translate(camera.x, camera.y);
         ctx.scale(camera.scale, camera.scale);
-        
         foods.forEach(f => f.draw());
-        resources.forEach(r => { if (r.update) r.update(); r.draw(); });
+        resources.forEach(r => r.draw());
         cities.forEach(c => c.draw());
         bumbles.forEach(b => b.draw());
-        
+        projectiles.forEach(p => p.draw());
         ctx.restore();
     }
 
     function animate() {
         if (!isRunning) return;
         animationFrameId = requestAnimationFrame(animate);
-        for (let i = 0; i < settings.timeMultiplier; i++) { updateSimulation(); }
+        for (let i = 0; i < settings.timeMultiplier; i++) updateSimulation();
         drawSimulation();
         if (frameCount % 30 === 0) updateUI();
     }
 
     function updateUI() {
-        populationStat.textContent = bumbles.length;
+        populationStat.textContent = `${bumbles.length} / ${GLOBAL_POP_CAP}`;
         dayStat.textContent = Math.floor(day);
         timeOfDayStat.textContent = timeOfDay;
         provincesStat.textContent = provinces.length;
         citiesStat.textContent = cities.length;
-        doctorsStat.textContent = bumbles.filter(b => b.isDoctor).length;
-        const familyNames = [...new Set(bumbles.filter(b => b.lastName).map(b => b.lastName))];
-        familiesCountStat.textContent = familyNames.length;
-        if (familyNames.length > 0) {
-            familyListStat.innerHTML = familyNames.sort().join('<br>');
-        } else {
-            familyListStat.textContent = 'None';
-        }
+        scientistsStat.textContent = bumbles.filter(b => b.job === 'scientist').length;
+        workersStat.textContent = bumbles.filter(b => b.job === 'worker').length;
+        soldiersStat.textContent = bumbles.filter(b => b.job === 'soldier').length;
+        infectedStat.textContent = bumbles.filter(b => b.isZombie).length;
     }
-
-    function makeDraggable(panel) {
-        const handle = panel.querySelector('.drag-handle');
-        if (!handle) return;
-        let isDragging = false;
-        let offsetX, offsetY;
-        handle.addEventListener('mousedown', (e) => {
-            isDragging = true;
-            offsetX = e.clientX - panel.getBoundingClientRect().left;
-            offsetY = e.clientY - panel.getBoundingClientRect().top;
-            handle.style.cursor = 'grabbing';
-            panel.style.transition = 'none';
-        });
-        window.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
-            let newX = e.clientX - offsetX;
-            let newY = e.clientY - offsetY;
-            const containerRect = document.getElementById('simulation-container').getBoundingClientRect();
-            newX = Math.max(0, Math.min(newX, containerRect.width - panel.offsetWidth));
-            newY = Math.max(0, Math.min(newY, containerRect.height - panel.offsetHeight));
-            panel.style.left = `${newX}px`;
-            panel.style.top = `${newY}px`;
-            panel.style.transform = '';
-        });
-        window.addEventListener('mouseup', () => {
-            isDragging = false;
-            handle.style.cursor = 'grab';
-            panel.style.transition = '';
-        });
-    }
-    makeDraggable(document.getElementById('stats-panel'));
-    makeDraggable(document.getElementById('tool-panel'));
     
-    // --- EVENT LISTENERS ---
-    function togglePlayPause() {
-        isRunning = !isRunning;
-        playIcon.classList.toggle('hidden');
-        pauseIcon.classList.toggle('hidden');
-        playPauseBtn.classList.toggle('paused');
-
-        if (isRunning) {
-            animate();
-        } else {
-            cancelAnimationFrame(animationFrameId);
-        }
+    // --- EVENT LISTENERS & SETUP ---
+    function togglePlayPause() { isRunning = !isRunning; playIcon.classList.toggle('hidden'); pauseIcon.classList.toggle('hidden'); playPauseBtn.classList.toggle('paused'); if (isRunning) animate(); else cancelAnimationFrame(animationFrameId); }
+    function showBumbleInfo(bumble) { bumbleName.textContent = bumble.fullName; bumbleGeneration.textContent = bumble.generation; bumbleHealthBar.style.width = `${(bumble.needs.health / 120 * 100)}%`; let stateText = bumble.state.charAt(0).toUpperCase() + bumble.state.slice(1); bumbleState.textContent = stateText; bumbleCity.textContent = cities.find(c => c.id === bumble.cityId)?.name || 'Nomad'; bumbleProvince.textContent = provinces.find(p => p.id === bumble.provinceId)?.name || 'None'; bumbleJob.textContent = bumble.job.charAt(0).toUpperCase() + bumble.job.slice(1); bumbleAmbition.textContent = `${bumble.ambition.toFixed(1)}`; bumbleInfoModal.classList.add('visible'); }
+    function showCityInfo(city) {
+        const province = provinces.find(p => p.id === city.provinceId);
+        cityName.textContent = city.name;
+        cityProvince.textContent = province ? province.name : 'Unclaimed';
+        cityPopulation.textContent = `${bumbles.filter(b => b.cityId === city.id).length} / ${CITY_POP_CAP}`;
+        cityFood.textContent = city.foodStockpile;
+        cityWood.textContent = city.woodStockpile;
+        cityInfoModal.classList.add('visible');
     }
 
-    function showBumbleInfo(bumble) {
-        bumbleName.textContent = bumble.fullName;
-        bumbleGeneration.textContent = bumble.generation;
-        bumbleGender.textContent = bumble.gender.charAt(0).toUpperCase() + bumble.gender.slice(1);
-        bumbleGender.style.color = bumble.gender === 'male' ? '#93c5fd' : '#f9a8d4';
-        bumbleLifespan.textContent = `${bumble.lifespan.toFixed(1)} days`; 
-        bumbleHealthBar.style.width = `${bumble.needs.health}%`;
-        let stateText = bumble.state.charAt(0).toUpperCase() + bumble.state.slice(1);
-        if (bumble.isDoctor) stateText += ' (Doctor)';
-        bumbleOccupation.textContent = stateText;
-        const homeCity = cities.find(c => c.id === bumble.cityId);
-        const province = provinces.find(p => p.id === bumble.provinceId);
-        bumbleCity.textContent = homeCity ? homeCity.name : 'Nomad';
-        bumbleProvince.textContent = province ? province.name : 'None';
-        bumbleFertility.textContent = `${(bumble.fertility * 100).toFixed(0)}%`;
-        bumbleInfoModal.classList.add('visible');
-    }
-
-    startScreen.addEventListener('click', () => {
-        startScreen.style.opacity = '0';
-        startScreen.style.visibility = 'hidden';
-        if (!isRunning) togglePlayPause();
-    }, { once: true });
-
-    restartBtn.addEventListener('click', () => { 
-        if (isRunning) {
-            cancelAnimationFrame(animationFrameId);
-        }
-        init();
-        isRunning = true;
-        playIcon.classList.add('hidden');
-        pauseIcon.classList.remove('hidden');
-        playPauseBtn.classList.remove('paused');
-        animate();
-        updateUI(); 
-        drawSimulation(); 
-    });
+    startScreen.addEventListener('click', () => { startScreen.style.opacity = '0'; startScreen.style.visibility = 'hidden'; if (!isRunning) togglePlayPause(); }, { once: true });
+    playPauseBtn.addEventListener('click', togglePlayPause);
+    restartBtn.addEventListener('click', () => { if(isRunning) togglePlayPause(); init(); playIcon.classList.remove('hidden'); pauseIcon.classList.add('hidden'); playPauseBtn.classList.add('paused'); });
     settingsBtn.addEventListener('click', () => settingsModal.classList.add('visible'));
     closeSettingsBtn.addEventListener('click', () => settingsModal.classList.remove('visible'));
-    
-    zombieBtn.addEventListener('click', () => {
-        if (bumbles.length < 3) return;
-        for(let i = 0; i < 3; i++) {
-            const randomBumble = bumbles[Math.floor(Math.random() * bumbles.length)];
-            if(randomBumble) randomBumble.isZombie = true;
-        }
-    });
-
-    collapseStatsBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        statsPanel.classList.toggle('collapsed');
-        collapseStatsBtn.querySelector('svg').style.transform = statsPanel.classList.contains('collapsed') ? 'rotate(180deg)' : 'rotate(0deg)';
-    });
-    
+    closeInfoBtn.addEventListener('click', () => bumbleInfoModal.classList.remove('visible'));
+    closeCityInfoBtn.addEventListener('click', () => cityInfoModal.classList.remove('visible'));
+    zombieBtn.addEventListener('click', () => { if (bumbles.length > 2) for(let i=0; i<3; i++) bumbles[Math.floor(Math.random()*bumbles.length)].isZombie = true; });
+    collapseStatsBtn.addEventListener('click', () => { statsPanel.classList.toggle('collapsed'); collapseIcon.style.transform = statsPanel.classList.contains('collapsed') ? 'rotate(-180deg)' : 'rotate(0deg)'; });
     initialPopSlider.addEventListener('input', (e) => { settings.initialPopulation = parseInt(e.target.value); initialPopValue.textContent = e.target.value; });
+    treeDensitySlider.addEventListener('input', (e) => { settings.treeClusterDensity = parseInt(e.target.value); treeDensityValue.textContent = e.target.value; });
     foodIntervalSlider.addEventListener('input', (e) => { settings.foodSpawnInterval = parseInt(e.target.value); foodIntervalValue.textContent = e.target.value; });
     reproductionRateSlider.addEventListener('input', (e) => { settings.reproductionUrge = parseInt(e.target.value) / 100; reproductionRateValue.textContent = `${e.target.value}%`; });
     mutationRateSlider.addEventListener('input', (e) => { settings.mutationChance = parseInt(e.target.value) / 100; mutationRateValue.textContent = `${e.target.value}%`; });
     timeSpeedSlider.addEventListener('input', (e) => { settings.timeMultiplier = parseInt(e.target.value); timeSpeedValue.textContent = `${e.target.value}x`; });
-    
-    toolBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const tool = btn.dataset.tool;
-            if (activeTool === tool) { activeTool = null; btn.classList.remove('active'); canvas.style.cursor = 'grab'; }
-            else { activeTool = tool; toolBtns.forEach(b => b.classList.remove('active')); btn.classList.add('active'); canvas.style.cursor = 'copy'; }
-        });
-    });
-
-    function screenToWorld(x, y) {
-        return {
-            x: (x - camera.x) / camera.scale,
-            y: (y - camera.y) / camera.scale
-        };
-    }
-
-    canvas.addEventListener('wheel', (e) => {
-        e.preventDefault();
-        const zoomIntensity = 0.1;
-        const wheel = e.deltaY < 0 ? 1 : -1;
-        const zoom = Math.exp(wheel * zoomIntensity);
-        const mousePos = { x: e.clientX, y: e.clientY };
-        camera.x = mousePos.x - (mousePos.x - camera.x) * zoom;
-        camera.y = mousePos.y - (mousePos.y - camera.y) * zoom;
-        camera.scale *= zoom;
-        camera.scale = Math.max(0.1, Math.min(5, camera.scale));
-        if (!isRunning) drawSimulation();
-    }, { passive: false });
-
+    toolBtns.forEach(btn => { btn.addEventListener('click', () => { const tool = btn.dataset.tool; if (activeTool === tool) { activeTool = null; btn.classList.remove('active'); canvas.style.cursor = 'grab'; } else { activeTool = tool; toolBtns.forEach(b => b.classList.remove('active')); btn.classList.add('active'); canvas.style.cursor = 'copy'; } }); });
+    function screenToWorld(x, y) { return { x: (x - camera.x) / camera.scale, y: (y - camera.y) / camera.scale }; }
+    canvas.addEventListener('wheel', (e) => { e.preventDefault(); const zoom = Math.exp((e.deltaY < 0 ? 1 : -1) * 0.1); const mousePos = { x: e.clientX, y: e.clientY }; camera.x = mousePos.x - (mousePos.x - camera.x) * zoom; camera.y = mousePos.y - (mousePos.y - camera.y) * zoom; camera.scale = Math.max(0.1, Math.min(5, camera.scale * zoom)); if (!isRunning) drawSimulation(); }, { passive: false });
     let panStart = { x: 0, y: 0 };
-    canvas.addEventListener('mousedown', (e) => {
-        panStart.x = e.clientX;
-        panStart.y = e.clientY;
-        const worldPos = screenToWorld(e.clientX, e.clientY);
-        const clickedBumble = bumbles.find(b => getDistance(worldPos.x, worldPos.y, b.x, b.y) < b.radius / camera.scale);
-        if (!clickedBumble && !activeTool) {
-            camera.isPanning = true;
-            camera.lastPanX = e.clientX;
-            camera.lastPanY = e.clientY;
-        }
-    });
-
-    canvas.addEventListener('mousemove', (e) => {
-        if (camera.isPanning) {
-            const dx = e.clientX - camera.lastPanX;
-            const dy = e.clientY - camera.lastPanY;
-            camera.x += dx;
-            camera.y += dy;
-            camera.lastPanX = e.clientX;
-            camera.lastPanY = e.clientY;
-            if (!isRunning) drawSimulation();
-        }
-    });
-
+    canvas.addEventListener('mousedown', (e) => { panStart = { x: e.clientX, y: e.clientY }; const worldPos = screenToWorld(e.clientX, e.clientY); if (!bumbles.find(b => getDistance(worldPos.x, worldPos.y, b.x, b.y) < b.radius) && !cities.find(c => getDistance(worldPos.x, worldPos.y, c.x, c.y) < c.radius) && !activeTool) { camera.isPanning = true; camera.lastPanX = e.clientX; camera.lastPanY = e.clientY; } });
+    canvas.addEventListener('mousemove', (e) => { if (camera.isPanning) { camera.x += e.clientX - camera.lastPanX; camera.y += e.clientY - camera.lastPanY; camera.lastPanX = e.clientX; camera.lastPanY = e.clientY; if (!isRunning) drawSimulation(); } });
     canvas.addEventListener('mouseup', (e) => {
         camera.isPanning = false;
-        const dist = getDistance(panStart.x, panStart.y, e.clientX, e.clientY);
-        if (dist > 5) return;
-
+        if (getDistance(panStart.x, panStart.y, e.clientX, e.clientY) > 5) return;
         const worldPos = screenToWorld(e.clientX, e.clientY);
         if (activeTool) {
             if (activeTool === 'food') foods.push(new Food(worldPos.x, worldPos.y));
@@ -1102,73 +857,34 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!isRunning) drawSimulation();
             return;
         }
-        
-        const clickedBumble = bumbles.find(b => getDistance(worldPos.x, worldPos.y, b.x, b.y) < b.radius / camera.scale);
-        if (clickedBumble) showBumbleInfo(clickedBumble);
+        const clickedBumble = bumbles.find(b => getDistance(worldPos.x, worldPos.y, b.x, b.y) < (b.isPresident ? b.radius * 1.25 : b.radius));
+        if (clickedBumble) { showBumbleInfo(clickedBumble); return; }
+        const clickedCity = cities.find(c => getDistance(worldPos.x, worldPos.y, c.x, c.y) < c.radius);
+        if (clickedCity) { showCityInfo(clickedCity); return; }
     });
     canvas.addEventListener('mouseleave', () => { camera.isPanning = false; });
-
-    canvas.addEventListener('touchstart', (e) => {
-        if (e.touches.length === 1) {
-            camera.isPanning = true;
-            camera.lastPanX = e.touches[0].clientX;
-            camera.lastPanY = e.touches[0].clientY;
-        } else if (e.touches.length === 2) {
+    canvas.addEventListener('touchstart', (e) => { if (e.touches.length === 1) { panStart = { x: e.touches[0].clientX, y: e.touches[0].clientY }; camera.isPanning = true; camera.lastPanX = e.touches[0].clientX; camera.lastPanY = e.touches[0].clientY; } else if (e.touches.length === 2) { camera.isPanning = false; const dx = e.touches[0].clientX - e.touches[1].clientX; const dy = e.touches[0].clientY - e.touches[1].clientY; camera.lastTouchDist = Math.sqrt(dx * dx + dy * dy); } });
+    canvas.addEventListener('touchmove', (e) => { e.preventDefault(); if (e.touches.length === 1 && camera.isPanning) { const dx = e.touches[0].clientX - camera.lastPanX; const dy = e.touches[0].clientY - camera.lastPanY; camera.x += dx; camera.y += dy; camera.lastPanX = e.touches[0].clientX; camera.lastPanY = e.touches[0].clientY; } else if (e.touches.length === 2) { const dx = e.touches[0].clientX - e.touches[1].clientX; const dy = e.touches[0].clientY - e.touches[1].clientY; const currentDist = Math.sqrt(dx * dx + dy * dy); const zoom = currentDist / camera.lastTouchDist; const touchMidpoint = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 }; camera.x = touchMidpoint.x - (touchMidpoint.x - camera.x) * zoom; camera.y = touchMidpoint.y - (touchMidpoint.y - camera.y) * zoom; camera.scale = Math.max(0.1, Math.min(5, camera.scale * zoom)); camera.lastTouchDist = currentDist; } if (!isRunning) drawSimulation(); }, { passive: false });
+    canvas.addEventListener('touchend', (e) => {
+        if (e.touches.length === 0) {
             camera.isPanning = false;
-            const dx = e.touches[0].clientX - e.touches[1].clientX;
-            const dy = e.touches[0].clientY - e.touches[1].clientY;
-            camera.lastTouchDist = Math.sqrt(dx * dx + dy * dy);
+            camera.lastTouchDist = 0;
+            if (panStart && getDistance(panStart.x, panStart.y, e.changedTouches[0].clientX, e.changedTouches[0].clientY) < 10) {
+                 const worldPos = screenToWorld(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+                const clickedBumble = bumbles.find(b => getDistance(worldPos.x, worldPos.y, b.x, b.y) < (b.isPresident ? b.radius * 1.25 : b.radius));
+                if (clickedBumble) { showBumbleInfo(clickedBumble); return; }
+                const clickedCity = cities.find(c => getDistance(worldPos.x, worldPos.y, c.x, c.y) < c.radius);
+                if (clickedCity) { showCityInfo(clickedCity); return; }
+            }
         }
     });
 
-    canvas.addEventListener('touchmove', (e) => {
-        e.preventDefault();
-        if (e.touches.length === 1 && camera.isPanning) {
-            const dx = e.touches[0].clientX - camera.lastPanX;
-            const dy = e.touches[0].clientY - camera.lastPanY;
-            camera.x += dx;
-            camera.y += dy;
-            camera.lastPanX = e.touches[0].clientX;
-            camera.lastPanY = e.touches[0].clientY;
-        } else if (e.touches.length === 2) {
-            const dx = e.touches[0].clientX - e.touches[1].clientX;
-            const dy = e.touches[0].clientY - e.touches[1].clientY;
-            const currentDist = Math.sqrt(dx * dx + dy * dy);
-            const zoom = currentDist / camera.lastTouchDist;
-            const touchMidpoint = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 };
-            camera.x = touchMidpoint.x - (touchMidpoint.x - camera.x) * zoom;
-            camera.y = touchMidpoint.y - (touchMidpoint.y - camera.y) * zoom;
-            camera.scale *= zoom;
-            camera.scale = Math.max(0.1, Math.min(5, camera.scale));
-            camera.lastTouchDist = currentDist;
-        }
-        if (!isRunning) drawSimulation();
-    }, { passive: false });
-
-    canvas.addEventListener('touchend', () => {
-        camera.isPanning = false;
-        camera.lastTouchDist = 0;
-    });
-
-    closeInfoBtn.addEventListener('click', () => bumbleInfoModal.classList.remove('visible'));
-    [bumbleInfoModal, settingsModal].forEach(modal => { modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('visible'); }); });
-
-    window.addEventListener('resize', () => {
-        const wasRunning = isRunning;
-        if (wasRunning) { isRunning = false; cancelAnimationFrame(animationFrameId); }
-        init();
-        if(wasRunning) {
-            isRunning = true;
-            animate();
-        }
-        updateUI();
-        drawSimulation();
-    });
-
+    window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; if (!isRunning) drawSimulation(); });
+    
     // --- Initial Setup ---
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
     init();
-    drawSimulation();
-    updateUI();
 });
 </script>
 </body>
